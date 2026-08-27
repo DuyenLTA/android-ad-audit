@@ -39,7 +39,6 @@ def test_start_stop_lifecycle_with_real_device():
     at.text_input[0].set_value(
         "https://docs.google.com/spreadsheets/d/14XivZl9VPAnyf8hYICgRh-TOUmkGTZDCqoyWmPM57hM/edit"
     )
-    at.text_area[0].set_value("FOR_TESTER")
     at.run()
 
     assert not at.session_state["capture_proc"]
@@ -52,6 +51,7 @@ def test_start_stop_lifecycle_with_real_device():
     at.button(key="stop_btn").click().run(timeout=20)  # includes a real network fetch of the sheet
     assert at.session_state["capture_proc"] is None
     assert not at.exception
+    assert at.get("link_button")[0].url.startswith("file://")
 
 
 def test_stop_with_invalid_sheet_url_shows_clean_error(tmp_path):

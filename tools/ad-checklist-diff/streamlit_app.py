@@ -17,6 +17,11 @@ import streamlit as st
 
 from check_ads import diff, extract_values, fetch_checklist, load_trusted_lines, render_html
 
+# Locked to this org's two standard logcat filters -- not user-editable.
+# If a future app needs different filter names, change this list (or use
+# the CLI's --filter flag directly for one-off apps that differ).
+FILTERS = ["FOR_TESTER", "VslTemplate4FirstOpenSDK"]
+
 st.set_page_config(page_title="Ad Checklist Diff", page_icon="\U0001f4cb")
 st.title("Ad Checklist Diff")
 st.caption(
@@ -53,13 +58,8 @@ def new_temp_path(suffix: str, prefix: str) -> Path:
 capturing = st.session_state.capture_proc is not None
 
 sheet_url = st.text_input("Google Sheet checklist URL", disabled=capturing)
-filters_text = st.text_area(
-    "Filters (one per line)",
-    placeholder="FOR_TESTER\nVslTemplate4FirstOpenSDK",
-    height=100,
-    disabled=capturing,
-)
-filters = [f.strip() for f in filters_text.splitlines() if f.strip()]
+st.caption("Filters (fixed): " + ", ".join(f"`{f}`" for f in FILTERS))
+filters = FILTERS
 
 col1, col2 = st.columns(2)
 
@@ -123,6 +123,14 @@ else:
                 st.success(f"Report saved to: {report_path}")
                 if empty_filters:
                     st.warning(f"These filters matched 0 log lines: {', '.join(empty_filters)}")
+                st.link_button(
+                    "\U0001f5a5️ Mở report toàn màn hình",
+                    report_path.resolve().as_uri(),
+                )
+                st.caption(
+                    "Link local (file trên máy này) -- không phải link claude.ai chia sẻ được. "
+                    "Muốn có link chia sẻ, gửi lại report cho Claude ở 1 lượt chat."
+                )
                 st.components.v1.html(
                     report_path.read_text(encoding="utf-8"), height=1200, scrolling=True
                 )
