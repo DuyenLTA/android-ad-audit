@@ -1,0 +1,518 @@
+<title>Nexus Ad Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink:#14171c;
+    --ink-soft:#4b525c;
+    --paper:#f2f3f5;
+    --surface:#ffffff;
+    --line:#dadfe3;
+    --accent:#1f6f78;
+    --accent-soft:#e4eeee;
+    --pass:#2e7d4f;
+    --pass-soft:#e5f3ea;
+    --fail:#c0392b;
+    --fail-soft:#fbe9e7;
+    --warn:#b8790c;
+    --warn-soft:#faf1de;
+    --pending:#6b7280;
+    --pending-soft:#eceef0;
+    font-size:16px;
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ink:#e8eaed;
+      --ink-soft:#a7adb6;
+      --paper:#101317;
+      --surface:#171b20;
+      --line:#2a2f36;
+      --accent:#5fc2cb;
+      --accent-soft:#1a2f31;
+      --pass:#5fbd85;
+      --pass-soft:#16261c;
+      --fail:#e2695a;
+      --fail-soft:#2b1a18;
+      --warn:#dba53f;
+      --warn-soft:#2b2415;
+      --pending:#9aa1ab;
+      --pending-soft:#1c2025;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ink:#e8eaed;
+    --ink-soft:#a7adb6;
+    --paper:#101317;
+    --surface:#171b20;
+    --line:#2a2f36;
+    --accent:#5fc2cb;
+    --accent-soft:#1a2f31;
+    --pass:#5fbd85;
+    --pass-soft:#16261c;
+    --fail:#e2695a;
+    --fail-soft:#2b1a18;
+    --warn:#dba53f;
+    --warn-soft:#2b2415;
+    --pending:#9aa1ab;
+    --pending-soft:#1c2025;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+
+  h1,h2,h3{
+    font-family:'Manrope', sans-serif;
+    text-wrap:balance;
+    margin:0;
+  }
+
+  .wrap{
+    max-width:960px;
+    margin:0 auto;
+    padding:2.5rem 1.5rem 5rem;
+    display:flex;
+    flex-direction:column;
+    gap:2.75rem;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead{
+    display:flex;
+    flex-direction:column;
+    gap:1.25rem;
+    padding-bottom:1.75rem;
+    border-bottom:1px solid var(--line);
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    font-weight:600;
+  }
+  .masthead h1{
+    font-size:clamp(1.7rem, 4vw, 2.35rem);
+    font-weight:800;
+    letter-spacing:-0.01em;
+  }
+  .masthead-meta{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px,1fr));
+    gap:0.9rem 1.5rem;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+  }
+  .masthead-meta dt{
+    font-size:0.68rem;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--ink-soft);
+    opacity:0.75;
+    margin-bottom:0.15rem;
+  }
+  .masthead-meta dd{
+    margin:0;
+    color:var(--ink);
+    word-break:break-all;
+  }
+
+  /* ---------- scorecards ---------- */
+  .scorecards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(160px,1fr));
+    gap:1px;
+    background:var(--line);
+    border:1px solid var(--line);
+    border-radius:10px;
+    overflow:hidden;
+  }
+  .scorecard{
+    background:var(--surface);
+    padding:1.15rem 1.25rem;
+    display:flex;
+    flex-direction:column;
+    gap:0.35rem;
+  }
+  .scorecard .num{
+    font-family:'Manrope', sans-serif;
+    font-weight:800;
+    font-size:2rem;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.02em;
+  }
+  .scorecard .label{
+    font-size:0.78rem;
+    color:var(--ink-soft);
+  }
+  .scorecard.pass .num{color:var(--pass);}
+  .scorecard.warn .num{color:var(--warn);}
+  .scorecard.pending .num{color:var(--pending);}
+
+  /* ---------- section ---------- */
+  section{
+    display:flex;
+    flex-direction:column;
+    gap:1.1rem;
+  }
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:1rem;
+    flex-wrap:wrap;
+  }
+  .section-head h2{
+    font-size:1.25rem;
+    font-weight:700;
+  }
+  .section-sub{
+    font-size:0.85rem;
+    color:var(--ink-soft);
+    font-family:'JetBrains Mono', monospace;
+  }
+  .filter-tag{
+    display:inline-block;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    background:var(--accent-soft);
+    color:var(--accent);
+    padding:0.15rem 0.5rem;
+    border-radius:5px;
+    font-weight:600;
+  }
+
+  /* ---------- table ---------- */
+  .table-scroll{
+    overflow-x:auto;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--surface);
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:0.88rem;
+    min-width:560px;
+  }
+  thead th{
+    text-align:left;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.68rem;
+    text-transform:uppercase;
+    letter-spacing:0.07em;
+    color:var(--ink-soft);
+    font-weight:600;
+    padding:0.7rem 1rem;
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:0.6rem 1rem;
+    border-bottom:1px solid var(--line);
+    vertical-align:middle;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.group-row td{
+    padding-top:0.9rem;
+    padding-bottom:0.3rem;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.7rem;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--accent);
+    border-bottom:none;
+    background:var(--accent-soft);
+  }
+  .cell-label{color:var(--ink); font-weight:500;}
+  .cell-mono{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.83rem;
+    font-variant-numeric:tabular-nums;
+    color:var(--ink-soft);
+  }
+  .cell-mono.match{color:var(--ink);}
+
+  .status{
+    display:inline-flex;
+    align-items:center;
+    gap:0.35rem;
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.72rem;
+    font-weight:600;
+    padding:0.2rem 0.55rem;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .status.pass{background:var(--pass-soft); color:var(--pass);}
+  .status.fail{background:var(--fail-soft); color:var(--fail);}
+  .status.warn{background:var(--warn-soft); color:var(--warn);}
+  .status.pending{background:var(--pending-soft); color:var(--pending);}
+  .status .dot{width:6px; height:6px; border-radius:50%; background:currentColor; flex:none;}
+
+  /* ---------- callout ---------- */
+  .callout{
+    border:1px solid var(--line);
+    border-left:3px solid var(--warn);
+    background:var(--warn-soft);
+    border-radius:0 8px 8px 0;
+    padding:1rem 1.25rem;
+    display:flex;
+    flex-direction:column;
+    gap:0.6rem;
+  }
+  .callout.pending{border-left-color:var(--pending); background:var(--pending-soft);}
+  .callout h3{
+    font-size:0.95rem;
+    font-weight:700;
+  }
+  .callout p{margin:0; font-size:0.86rem; color:var(--ink-soft);}
+  .chip-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:0.5rem;
+  }
+  .chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.76rem;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:0.3rem 0.55rem;
+    color:var(--ink);
+  }
+  .chip b{color:var(--warn); font-weight:600;}
+
+  .prefix-note{
+    font-family:'JetBrains Mono', monospace;
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:0.6rem 1rem;
+  }
+  .prefix-note b{color:var(--ink); font-weight:600;}
+
+  footer{
+    border-top:1px solid var(--line);
+    padding-top:1.5rem;
+    font-size:0.78rem;
+    color:var(--ink-soft);
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:space-between;
+    gap:0.75rem;
+  }
+  footer span{font-family:'JetBrains Mono', monospace;}
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Config &amp; Ad ID Verification</div>
+    <h1>Nexus — AI Video Generator</h1>
+    <dl class="masthead-meta">
+      <div><dt>Package</dt><dd>ai.photogenerator.aivideo.aivideogenerator.aiart</dd></div>
+      <div><dt>Thiết bị</dt><dd>29301FDH2006K7 (máy thật)</dd></div>
+      <div><dt>Nguồn checklist</dt><dd>Google Sheet — "Check thông số KT"</dd></div>
+      <div><dt>Phương pháp</dt><dd>adb logcat, đối chiếu theo filter</dd></div>
+    </dl>
+  </header>
+
+  <div class="scorecards">
+    <div class="scorecard pass">
+      <div class="num">40 / 40</div>
+      <div class="label">Dòng checklist đã check — khớp</div>
+    </div>
+    <div class="scorecard warn">
+      <div class="num">6</div>
+      <div class="label">ID thấy trong log, không có trong sheet</div>
+    </div>
+    <div class="scorecard pending">
+      <div class="num">18</div>
+      <div class="label">Dòng "ID ads inapp" — chưa check</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <h2>1. Thông số kỹ thuật</h2>
+      <span class="filter-tag">filter: FOR_TESTER</span>
+    </div>
+    <p class="section-sub">Nguồn: tag <code>FOR_TESTER_CONFIG</code>, capture lúc 23:45:48 — spam tap logo màn splash.</p>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Thông số</th><th>Sheet</th><th>Log thiết bị</th><th>Kết quả</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="cell-label">Adjust config environment</td>
+            <td class="cell-mono">production</td>
+            <td class="cell-mono match">production</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">Adjust config token</td>
+            <td class="cell-mono">uz6fb8kyeww0</td>
+            <td class="cell-mono match">uz6fb8kyeww0</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">Adjust event — purchase</td>
+            <td class="cell-mono">y9idfz</td>
+            <td class="cell-mono match">y9idfz</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">Adjust event — ad impression</td>
+            <td class="cell-mono">l29wl6</td>
+            <td class="cell-mono match">l29wl6</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">Facebook App ID</td>
+            <td class="cell-mono">1676822933375650</td>
+            <td class="cell-mono match">1676822933375650</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">Facebook Client Token</td>
+            <td class="cell-mono">b0fec8b50648f21fecccce7125c0e349</td>
+            <td class="cell-mono match">b0fec8b50648f21fecccce7125c0e349</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">Package name</td>
+            <td class="cell-mono">ai.photogenerator.aivideo.aivideogenerator.aiart</td>
+            <td class="cell-mono match">xác nhận qua <code>pm list packages</code></td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+          <tr>
+            <td class="cell-label">App ID (AdMob)</td>
+            <td class="cell-mono">ca-app-pub-4973559944609228~7143022911</td>
+            <td class="cell-mono match">ca-app-pub-4973559944609228~7143022911</td>
+            <td><span class="status pass"><span class="dot"></span>Khớp</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>2. ID ads FO (First Open)</h2>
+      <span class="filter-tag">filter: VslTemplate4FirstOpenSDK</span>
+    </div>
+    <p class="section-sub">Nguồn: tag <code>FO_VslTemplate4FirstOpenSDK</code>, capture lúc 23:49:41 — chạy hết luồng tutorial tới home.</p>
+    <div class="prefix-note"><b>Prefix chung mọi ID:</b> ca-app-pub-4973559944609228/ — bảng dưới chỉ hiện phần đuôi.</div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Placement key</th><th>Sheet (đuôi ID)</th><th>Log (đuôi ID)</th><th>Kết quả</th></tr>
+        </thead>
+        <tbody>
+          <tr class="group-row"><td colspan="4">Banner splash — show_101_spl_a_banner</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">3458511852</td><td class="cell-mono match">3458511852</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">2471078251</td><td class="cell-mono match">2471078251</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Inter splash — show_102_spl_n_inter</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">5425590839</td><td class="cell-mono match">5425590839</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high1</td><td class="cell-mono">7531833244</td><td class="cell-mono match">7531833244</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">6218751578</td><td class="cell-mono match">6218751578</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Inter splash — show_102_spl_o_inter</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">4905669901</td><td class="cell-mono match">4905669901</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">9780377626</td><td class="cell-mono match">9780377626</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Native splash — show_105_spl_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">2009698815</td><td class="cell-mono match">2009698815</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">2279506560</td><td class="cell-mono match">2279506560</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Native splash full screen — show_106_spl_o_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">4112509166</td><td class="cell-mono match">4112509166</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high1</td><td class="cell-mono">9696617141</td><td class="cell-mono match">9696617141</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">6032095499</td><td class="cell-mono match">6032095499</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">LFO1 — show_201_lfo1_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">6280116312</td><td class="cell-mono match">6280116312</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high1</td><td class="cell-mono">9966424892</td><td class="cell-mono match">9966424892</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high2</td><td class="cell-mono">8653343222</td><td class="cell-mono match">8653343222</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">5860705102</td><td class="cell-mono match">5860705102</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">LFO2 — show_202_lfo2_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">6027179882</td><td class="cell-mono match">6027179882</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high1</td><td class="cell-mono">2087934877</td><td class="cell-mono match">2087934877</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high2</td><td class="cell-mono">8467295958</td><td class="cell-mono match">8467295958</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">8461771537</td><td class="cell-mono match">8461771537</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Onboarding 1 — show_301_onb1_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">8383535478</td><td class="cell-mono match">8383535478</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high1</td><td class="cell-mono">5641213251</td><td class="cell-mono match">5641213251</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high2</td><td class="cell-mono">5840523803</td><td class="cell-mono match">5840523803</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">4466686205</td><td class="cell-mono match">4466686205</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Onboarding 2 — show_302_onb2_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">3153604530</td><td class="cell-mono match">3153604530</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">4336479255</td><td class="cell-mono match">4336479255</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Onboarding 3 — show_303_onb3_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">1842177857</td><td class="cell-mono match">1842177857</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high1</td><td class="cell-mono">3023397583</td><td class="cell-mono match">3023397583</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">…_high2</td><td class="cell-mono">9529096186</td><td class="cell-mono match">9529096186</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">1840522866</td><td class="cell-mono match">1840522866</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+
+          <tr class="group-row"><td colspan="4">Onboarding 4 — show_304_onb4_n_native</td></tr>
+          <tr><td class="cell-label">…_high</td><td class="cell-mono">3462381285</td><td class="cell-mono match">3462381285</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+          <tr><td class="cell-label">(thường)</td><td class="cell-mono">8216014515</td><td class="cell-mono match">8216014515</td><td><span class="status pass"><span class="dot"></span>Khớp</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <h3>6 ID thấy trong log nhưng không có trong sheet</h3>
+      <p>Cùng filter <code>VslTemplate4FirstOpenSDK</code>, nhóm "AppResume" — không rõ sheet có cố ý bỏ qua hay thiếu sót. Không tính là sai, chỉ đưa vào diện cần xác nhận lại với người quản lý sheet.</p>
+      <div class="chip-list">
+        <span class="chip">AppResume native high — <b>4293922660</b></span>
+        <span class="chip">AppResume native — <b>2980840993</b></span>
+        <span class="chip">AppResume aoa high — <b>2562724354</b></span>
+        <span class="chip">AppResume aoa — <b>3910779284</b></span>
+        <span class="chip">AppResume inter high — <b>9995629880</b></span>
+        <span class="chip">AppResume inter — <b>9128132704</b></span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>3. ID ads inapp</h2>
+      <span class="filter-tag pending-tag" style="background:var(--pending-soft); color:var(--pending);">chưa check</span>
+    </div>
+    <div class="callout pending">
+      <h3>18 dòng chưa được đối chiếu trong phiên này</h3>
+      <p>Phần này cần chạy riêng từng luồng trong app (Loading, Upload Image, Generate I2I/I2V, Result, Home, luồng Uninstall...) với filter logcat tương ứng — chưa nằm trong phạm vi 2 filter đã check hôm nay (FOR_TESTER, VslTemplate4FirstOpenSDK).</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>Nguồn: adb logcat trên thiết bị thật · 27/08/2026</span>
+    <span>Checklist: Google Sheet "Check thông số KT" (62 dòng)</span>
+  </footer>
+
+</div>
