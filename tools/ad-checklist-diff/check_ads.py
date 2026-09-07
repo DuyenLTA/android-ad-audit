@@ -19,23 +19,32 @@ from checklist_source import fetch_checklist, parse_checklist_csv, sheet_csv_url
 from log_extractor import extract_values, load_trusted_lines  # noqa: F401
 from report_renderer import render_html  # noqa: F401
 
+# Confirmed one-off naming mismatches between a checklist value and the
+# internal key name the app actually logs it under -- same placement/flag,
+# unrelated string, with no derivable rule connecting the two. Verified by
+# hand (remote config console) rather than assumed. Add an entry here when
+# another row turns out to be a real match under a different name.
+KNOWN_ALIASES = {
+    "inter_feature_high": ["enable_401_home_a_inter_high"],
+}
+
 
 def diff(checklist: list[dict], trusted_values: set[str]) -> dict:
     """Group checklist rows by section, mark MATCH/MISSING, and find EXTRA values.
 
     A row also counts as found if any of its optional alt_values (sheet
-    column C) is present -- for placement keys the app logs under a
-    different internal name than the checklist uses.
+    column C) or KNOWN_ALIASES entries is present -- for placement keys the
+    app logs under a different internal name than the checklist uses.
     """
     sections: dict[str, list[dict]] = {}
     for row in checklist:
-        found = row["value"] in trusted_values or any(
-            alt in trusted_values for alt in row.get("alt_values", [])
-        )
+        alts = [*row.get("alt_values", []), *KNOWN_ALIASES.get(row["value"], [])]
+        found = row["value"] in trusted_values or any(alt in trusted_values for alt in alts)
         sections.setdefault(row["section"], []).append({**row, "found": found})
 
     checklist_values = {row["value"] for row in checklist}
     checklist_values.update(alt for row in checklist for alt in row.get("alt_values", []))
+    checklist_values.update(alt for alts in KNOWN_ALIASES.values() for alt in alts)
     extra = sorted(v for v in trusted_values if v not in checklist_values)
 
     return {"sections": sections, "extra": extra}

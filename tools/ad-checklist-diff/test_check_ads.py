@@ -137,6 +137,15 @@ def test_diff_marks_missing_and_extra():
     assert result["extra"] == ["999"]
 
 
+def test_diff_matches_via_known_alias():
+    # inter_feature_high is a confirmed KNOWN_ALIASES entry (see check_ads.py)
+    # -- no sheet column C needed for this one.
+    checklist = [{"section": "S", "label": "Home", "value": "inter_feature_high"}]
+    result = diff(checklist, {"enable_401_home_a_inter_high"})
+    assert result["sections"]["S"][0]["found"] is True
+    assert result["extra"] == []
+
+
 def test_diff_matches_via_alt_values():
     checklist = [
         {"section": "S", "label": "Home", "value": "inter_feature_high",
