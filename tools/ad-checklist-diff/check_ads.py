@@ -43,10 +43,10 @@ def _format_candidates(expected: str, candidates: list[str]) -> str:
     shown = candidates[:MAX_CANDIDATES_SHOWN]
     more = f" (+{len(candidates) - MAX_CANDIDATES_SHOWN} khác)" if len(candidates) > MAX_CANDIDATES_SHOWN else ""
     return (
-        f"ID checklist đang cần: {expected}. "
-        "Giá trị lạ thấy trong log (chưa rõ có phải cùng placement): "
+        f"ID checklist: {expected} (lệch) -- ID lệch thấy trong log: "
         + ", ".join(shown)
         + more
+        + " (chưa rõ có phải cùng placement, cần tự đối chiếu)"
     )
 
 
@@ -96,18 +96,18 @@ def _mismatch_note(
     """
     label, value = row["label"], row["value"]
     if label in label_value_pairs and label_value_pairs[label] != value:
-        return f"ID checklist đang cần: {value}. Log đang có giá trị khác: {label_value_pairs[label]}"
+        return f"ID checklist: {value} (lệch) -- ID lệch thấy trong log: {label_value_pairs[label]}"
     for key in (value, f"{SHOW_PREFIX}{value}"):
         if key in key_value_pairs and key_value_pairs[key].lower() != "true":
             return (
-                f"ID checklist đang cần: {value}. Flag có trong log nhưng đang tắt "
+                f"ID checklist: {value} (lệch) -- có trong log nhưng đang tắt "
                 f"(value={key_value_pairs[key]})"
             )
     if cooccurrence_candidates:
         return _format_candidates(value, cooccurrence_candidates)
     if ID_RE.fullmatch(value) and leftover_ids:
         return _format_candidates(value, leftover_ids)
-    return f"ID checklist đang cần: {value}. Không thấy giá trị lạ nào liên quan trong log"
+    return f"ID checklist: {value} (lệch) -- không thấy ID lệch nào tương ứng trong log"
 
 
 def diff(
