@@ -22,7 +22,7 @@ naming differs per app, values are unique.
   `adb shell pm list packages` (any checklist value shaped like a package
   name -- 3+ dot-separated segments -- gets this treatment automatically).
   Running the plain CLI with only `FOR_TESTER`/`VslTemplate4FirstOpenSDK`
-  will still show both rows as "Thiếu" even when correct -- use the GUI, or
+  will still show both rows as "Lệch" even when correct -- use the GUI, or
   add `--filter UserMessagingPlatform --filter AdsConsentManager` and verify
   the package name by hand.
 
@@ -94,7 +94,7 @@ once per checklist area you captured this run.
   value found in the log that isn't in the checklist.
 - If a `--filter` you passed matched **zero** log lines this run, that's
   called out as an explicit warning -- it means your capture doesn't cover
-  that area at all, so any "Thiếu" rows in that area might just be
+  that area at all, so any "Lệch" rows in that area might just be
   uncaptured, not actually broken. Capture again with the right filter/flow
   before trusting those rows.
 - `report.html` (or the equivalent GUI output) is the same info as a

@@ -14,7 +14,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
         row_html = []
         for r in rows:
             status = "pass" if r["found"] else "fail"
-            label_txt = "Khớp" if r["found"] else "Thiếu"
+            label_txt = "Khớp" if r["found"] else "Lệch"
             row_html.append(
                 f"<tr><td class='cell-label'>{html.escape(r['label'])}</td>"
                 f"<td class='cell-mono'>{html.escape(r['value'])}</td>"
@@ -32,7 +32,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
         chips = "".join(f"<span class='chip'>{html.escape(f)}</span>" for f in empty_filters)
         warning_html = (
             "<div class='callout'><h3>Filter không khớp dòng log nào trong lần capture này</h3>"
-            "<p>Các dòng \"Thiếu\" liên quan tới filter này có thể chỉ vì log chưa capture đúng "
+            "<p>Các dòng \"Lệch\" liên quan tới filter này có thể chỉ vì log chưa capture đúng "
             "vùng, không hẳn là app bị lỗi thật -- capture lại rồi chạy lại trước khi kết luận.</p>"
             f"<div class='chip-list'>{chips}</div></div>"
         )

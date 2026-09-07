@@ -53,7 +53,7 @@ def diff(checklist: list[dict], trusted_values: set[str]) -> dict:
 def print_summary(result: dict, empty_filters: list[str]) -> None:
     if empty_filters:
         print("WARNING: these --filter values matched 0 log lines this run")
-        print("(rows below marked 'Thiếu' because of this may just be uncaptured, not broken):")
+        print("(rows below marked 'Lệch' because of this may just be uncaptured, not broken):")
         for f in empty_filters:
             print(f"  - {f}")
         print()

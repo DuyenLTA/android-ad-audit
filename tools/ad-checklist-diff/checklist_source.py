@@ -29,7 +29,7 @@ def parse_checklist_csv(csv_text: str) -> list[dict]:
     doesn't match the internal key name the app actually logs (a naming
     inconsistency in the source app, not something this tool can derive),
     whoever maintains the sheet can note the real key there instead of the
-    tool silently reporting a false "Thiếu".
+    tool silently reporting a false "Lệch".
     """
     reader = csv.reader(io.StringIO(csv_text))
     rows = []
