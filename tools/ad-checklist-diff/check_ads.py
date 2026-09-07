@@ -21,12 +21,12 @@ from report_renderer import render_html  # noqa: F401
 
 # Confirmed one-off naming mismatches between a checklist value and the
 # internal key name the app actually logs it under -- same placement/flag,
-# unrelated string, with no derivable rule connecting the two. Verified by
-# hand (remote config console) rather than assumed. Add an entry here when
-# another row turns out to be a real match under a different name.
-KNOWN_ALIASES = {
-    "inter_feature_high": ["enable_401_home_a_inter_high"],
-}
+# unrelated string, with no derivable rule connecting the two. Only add an
+# entry here once you've actually confirmed (source code, or someone who
+# owns that flag) that the two names refer to the same thing -- a guess
+# based on naming pattern or log-line proximity is not confirmation and
+# produces a false "Khớp".
+KNOWN_ALIASES: dict[str, list[str]] = {}
 
 
 def diff(checklist: list[dict], trusted_values: set[str]) -> dict:

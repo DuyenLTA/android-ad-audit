@@ -1,3 +1,4 @@
+import check_ads
 from check_ads import diff, extract_values, load_trusted_lines, parse_checklist_csv, sheet_csv_url
 
 
@@ -137,11 +138,12 @@ def test_diff_marks_missing_and_extra():
     assert result["extra"] == ["999"]
 
 
-def test_diff_matches_via_known_alias():
-    # inter_feature_high is a confirmed KNOWN_ALIASES entry (see check_ads.py)
-    # -- no sheet column C needed for this one.
-    checklist = [{"section": "S", "label": "Home", "value": "inter_feature_high"}]
-    result = diff(checklist, {"enable_401_home_a_inter_high"})
+def test_diff_matches_via_known_alias(monkeypatch):
+    # KNOWN_ALIASES starts empty by default (every entry must be a confirmed
+    # mapping, not a guess) -- this test only exercises the mechanism.
+    monkeypatch.setitem(check_ads.KNOWN_ALIASES, "placement_x", ["internal_key_y"])
+    checklist = [{"section": "S", "label": "Home", "value": "placement_x"}]
+    result = diff(checklist, {"internal_key_y"})
     assert result["sections"]["S"][0]["found"] is True
     assert result["extra"] == []
 
