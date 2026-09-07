@@ -81,11 +81,13 @@ def test_parse_checklist_csv_section_headers_and_rows():
             "section": "Thông số kỹ thuật",
             "label": "Adjust config environment",
             "value": "production",
+            "alt_values": [],
         },
         {
             "section": "2. ID ads FO",
             "label": "show_101_spl_a_banner_high",
             "value": "ca-app-pub-4973559944609228/3458511852",
+            "alt_values": [],
         },
     ]
 
@@ -103,6 +105,23 @@ def test_parse_checklist_csv_detects_swapped_columns():
             "section": "4. ID ads resume",
             "label": "show_501_aoa_high",
             "value": "ca-app-pub-4973559944609228/2562724354",
+            "alt_values": [],
+        }
+    ]
+
+
+def test_parse_checklist_csv_reads_optional_alt_values_column():
+    csv_text = (
+        "3. ID ads inapp,\n"
+        "Home,inter_feature_high,enable_401_home_a_inter_high\n"
+    )
+    rows = parse_checklist_csv(csv_text)
+    assert rows == [
+        {
+            "section": "3. ID ads inapp",
+            "label": "Home",
+            "value": "inter_feature_high",
+            "alt_values": ["enable_401_home_a_inter_high"],
         }
     ]
 
@@ -116,3 +135,21 @@ def test_diff_marks_missing_and_extra():
     rows = result["sections"]["S"]
     assert {r["label"]: r["found"] for r in rows} == {"a": True, "b": False}
     assert result["extra"] == ["999"]
+
+
+def test_diff_matches_via_alt_values():
+    checklist = [
+        {"section": "S", "label": "Home", "value": "inter_feature_high",
+         "alt_values": ["enable_401_home_a_inter_high"]},
+    ]
+    result = diff(checklist, {"enable_401_home_a_inter_high"})
+    assert result["sections"]["S"][0]["found"] is True
+
+
+def test_diff_alt_values_excluded_from_extra():
+    checklist = [
+        {"section": "S", "label": "Home", "value": "inter_feature_high",
+         "alt_values": ["enable_401_home_a_inter_high"]},
+    ]
+    result = diff(checklist, {"enable_401_home_a_inter_high"})
+    assert result["extra"] == []

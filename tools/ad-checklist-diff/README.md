@@ -105,3 +105,12 @@ once per checklist area you captured this run.
 Checklist sheet must be shared "Anyone with the link can view", two columns:
 column A = label (or a section header when column B is empty), column B =
 expected value.
+
+An optional column C lists alternate log values that also count as a match,
+comma-separated. Use this when the app logs a placement under a different
+internal key name than the checklist uses -- a real naming inconsistency in
+the app's own code, not something the tool can derive automatically. Example:
+the Nexus checklist's "Home -> inter_feature_high" row is logged in code as
+`enable_401_home_a_inter_high` (same placement/flag, different internal
+name) -- add that string as column C on that row and it matches correctly
+even though the two names share no substring.

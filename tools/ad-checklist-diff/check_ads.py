@@ -21,14 +21,21 @@ from report_renderer import render_html  # noqa: F401
 
 
 def diff(checklist: list[dict], trusted_values: set[str]) -> dict:
-    """Group checklist rows by section, mark MATCH/MISSING, and find EXTRA values."""
+    """Group checklist rows by section, mark MATCH/MISSING, and find EXTRA values.
+
+    A row also counts as found if any of its optional alt_values (sheet
+    column C) is present -- for placement keys the app logs under a
+    different internal name than the checklist uses.
+    """
     sections: dict[str, list[dict]] = {}
     for row in checklist:
-        sections.setdefault(row["section"], []).append(
-            {**row, "found": row["value"] in trusted_values}
+        found = row["value"] in trusted_values or any(
+            alt in trusted_values for alt in row.get("alt_values", [])
         )
+        sections.setdefault(row["section"], []).append({**row, "found": found})
 
     checklist_values = {row["value"] for row in checklist}
+    checklist_values.update(alt for row in checklist for alt in row.get("alt_values", []))
     extra = sorted(v for v in trusted_values if v not in checklist_values)
 
     return {"sections": sections, "extra": extra}

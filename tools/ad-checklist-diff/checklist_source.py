@@ -22,13 +22,22 @@ def sheet_csv_url(sheet_url: str) -> str:
 
 
 def parse_checklist_csv(csv_text: str) -> list[dict]:
-    """Parse checklist CSV text into (section, label, value) rows."""
+    """Parse checklist CSV text into (section, label, value, alt_values) rows.
+
+    Column C is optional: a comma-separated list of alternate log values that
+    also count as a match. For rows where the checklist's placement-key name
+    doesn't match the internal key name the app actually logs (a naming
+    inconsistency in the source app, not something this tool can derive),
+    whoever maintains the sheet can note the real key there instead of the
+    tool silently reporting a false "Thiếu".
+    """
     reader = csv.reader(io.StringIO(csv_text))
     rows = []
     section = "(no section)"
     for cols in reader:
         col_a = (cols[0].strip() if len(cols) > 0 else "")
         col_b = (cols[1].strip() if len(cols) > 1 else "")
+        col_c = (cols[2].strip() if len(cols) > 2 else "")
         if not col_a and not col_b:
             continue
         if col_a and not col_b:
@@ -41,7 +50,8 @@ def parse_checklist_csv(csv_text: str) -> list[dict]:
             label, value = col_b, col_a
         else:
             label, value = col_a, col_b
-        rows.append({"section": section, "label": label, "value": value})
+        alt_values = [v.strip() for v in col_c.split(",") if v.strip()]
+        rows.append({"section": section, "label": label, "value": value, "alt_values": alt_values})
     return rows
 
 
