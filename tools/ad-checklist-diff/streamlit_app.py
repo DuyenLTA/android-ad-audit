@@ -18,16 +18,20 @@ import streamlit as st
 from check_ads import diff, extract_values, fetch_checklist, load_trusted_lines, render_html
 from package_verifier import verify_package_rows
 
-# Locked to this org's standard logcat filters -- not user-editable. The last
-# two catch the AdMob App ID's own log line, which FOR_TESTER/
-# VslTemplate4FirstOpenSDK never print. If a future app needs different
-# filter names, change this list (or use the CLI's --filter flag directly
-# for one-off apps that differ).
+# Locked to this org's standard logcat filters -- not user-editable.
+# UserMessagingPlatform/AdsConsentManager catch the AdMob App ID's own log
+# line, which FOR_TESTER/VslTemplate4FirstOpenSDK never print.
+# RemoteConfigRepository catches the "ID ads inapp" placement flags (e.g.
+# `key=show_native_loading_high, value=true`), which have no dedicated tag
+# of their own -- just a generic config dump at app start. If a future app
+# needs different filter names, change this list (or use the CLI's
+# --filter flag directly for one-off apps that differ).
 FILTERS = [
     "FOR_TESTER",
     "VslTemplate4FirstOpenSDK",
     "UserMessagingPlatform",
     "AdsConsentManager",
+    "RemoteConfigRepository",
 ]
 
 st.set_page_config(page_title="Ad Checklist Diff", page_icon="\U0001f4cb")

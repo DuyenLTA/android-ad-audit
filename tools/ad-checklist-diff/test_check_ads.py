@@ -30,6 +30,23 @@ def test_extract_values_trailing_colon_survives_earlier_bracket():
     assert "debug" in values  # bracket item still extracted too
 
 
+def test_extract_values_remote_config_key_shape_strips_show_prefix():
+    lines = [
+        "09-07 23:24:58.779 26748 26784 D RemoteConfigRepository: "
+        "\U0001f4be [Boolean] key=show_native_loading_high, value=true\n"
+    ]
+    values = extract_values(lines)
+    assert "show_native_loading_high" in values
+    assert "native_loading_high" in values  # show_ prefix stripped too
+
+
+def test_extract_values_remote_config_key_without_show_prefix_not_stripped():
+    lines = ["... key=enable_401_home_a_inter_high, value=true\n"]
+    values = extract_values(lines)
+    assert "enable_401_home_a_inter_high" in values
+    assert "enable_401_home_a_inter" not in values  # only a literal show_ prefix is stripped
+
+
 def test_load_trusted_lines_reports_zero_matches_per_filter(tmp_path):
     log = tmp_path / "capture.log"
     log.write_text("TAG_A: hello\nTAG_A: world\n", encoding="utf-8")

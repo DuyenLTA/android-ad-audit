@@ -4,6 +4,8 @@ import re
 from checklist_source import ID_RE
 
 BRACKET_RE = re.compile(r"\[([^\]]*)\]")
+KEY_VALUE_RE = re.compile(r"key=([\w.]+)")
+SHOW_PREFIX = "show_"
 
 
 def load_trusted_lines(log_path: str, filters: list[str]) -> dict[str, list[str]]:
@@ -28,10 +30,13 @@ def load_trusted_lines(log_path: str, filters: list[str]) -> dict[str, list[str]
 def extract_values(lines: list[str]) -> set[str]:
     """Pull candidate config/ID values out of trusted log lines.
 
-    Three shapes are supported (all seen in real captures):
+    Four shapes are supported (all seen in real captures):
       1. `TAG: Adjust config token: uz6fb8kyeww0`      -> trailing value after last colon
       2. `TAG: LFO1: [id1, id2, id3]`                  -> bracket-list members
       3. `... ca-app-pub-123/456 ...` anywhere in line -> AdMob app/unit IDs
+      4. `RemoteConfigRepository: key=show_native_loading_high, value=true`
+         -> remote-config flag key, both as printed and with a leading
+         `show_` stripped (checklist placement keys are written without it)
     """
     values = set()
     for line in lines:
@@ -43,6 +48,12 @@ def extract_values(lines: list[str]) -> set[str]:
                 item = item.strip()
                 if item:
                     values.add(item)
+
+        for m in KEY_VALUE_RE.finditer(line):
+            key = m.group(1)
+            values.add(key)
+            if key.startswith(SHOW_PREFIX):
+                values.add(key[len(SHOW_PREFIX):])
 
         # Independent of whether the line also had a bracket list -- a line
         # can have both a leading `[tag]`-style marker and a trailing
