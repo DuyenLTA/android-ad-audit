@@ -52,9 +52,9 @@ FILTERS = [
 # the report/artifact reading as one visual family instead of two.
 CUSTOM_CSS = """
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  h1, h2, h3 { font-family: 'Barlow Condensed', sans-serif !important; font-weight: 700 !important; }
+  h1, h2, h3 { font-family: 'Manrope', sans-serif !important; font-weight: 800 !important; }
   .stButton > button[kind="primary"] { background-color: #146b6e; border-color: #146b6e; }
   .stButton > button[kind="primary"]:hover { background-color: #0f5457; border-color: #0f5457; }
   .filter-chip-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.2rem 0 0.6rem; }

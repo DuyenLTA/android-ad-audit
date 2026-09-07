@@ -62,7 +62,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
 
     page = f"""<title>Ad Checklist Diff</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{{
     --ink:#10181a;--ink-soft:#56686a;--paper:#eef2f1;--surface:#fff;--surface-alt:#f5f8f7;--line:#d7e1df;
@@ -91,17 +91,17 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
   .wrap{{max-width:900px;margin:0 auto;padding:2.5rem 1.5rem 4rem;display:flex;flex-direction:column;gap:1.75rem;}}
 
   .report-head{{display:flex;flex-direction:column;gap:1.1rem;}}
-  .eyebrow{{margin:0;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:0.85rem;
+  .eyebrow{{margin:0;font-family:'Manrope',sans-serif;font-weight:800;font-size:0.85rem;
     letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);}}
-  h1{{margin:0;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:2.1rem;
+  h1{{margin:0;font-family:'Manrope',sans-serif;font-weight:800;font-size:2.1rem;
     letter-spacing:0.01em;text-wrap:balance;}}
 
   .scorecard{{background:var(--surface);border:1px solid var(--line);border-radius:12px;
     padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:0.6rem;}}
   .score-row{{display:flex;align-items:baseline;gap:0.4rem;}}
-  .score-num{{font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:2.6rem;color:var(--pass);
+  .score-num{{font-family:'Manrope',sans-serif;font-weight:800;font-size:2.6rem;color:var(--pass);
     line-height:1;}}
-  .score-den{{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.3rem;color:var(--ink-soft);}}
+  .score-den{{font-family:'Manrope',sans-serif;font-weight:700;font-size:1.3rem;color:var(--ink-soft);}}
   .score-label{{font-size:0.85rem;color:var(--ink-soft);}}
   .score-bar{{height:6px;border-radius:99px;background:var(--surface-alt);overflow:hidden;}}
   .score-bar-fill{{height:100%;border-radius:99px;background:var(--pass);}}
@@ -116,7 +116,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
 
   .callout{{border:1px solid var(--line);border-left:3px solid var(--pending);background:var(--pending-soft);
     border-radius:0 10px 10px 0;padding:1rem 1.25rem;}}
-  .callout h3{{margin:0 0 0.35rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:1.05rem;}}
+  .callout h3{{margin:0 0 0.35rem;font-family:'Manrope',sans-serif;font-weight:800;font-size:1.05rem;}}
   .callout p{{margin:0;font-size:0.88rem;color:var(--ink-soft);max-width:65ch;}}
   .chip-list{{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.6rem;}}
   .chip{{font-family:'JetBrains Mono',monospace;font-size:0.76rem;background:var(--surface);
@@ -130,7 +130,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
   summary::before{{content:'▸';display:inline-block;margin-right:0.6rem;color:var(--ink-soft);
     transition:transform 0.15s ease;}}
   details[open] summary::before{{transform:rotate(90deg);}}
-  .section-title{{font-family:'Barlow Condensed',sans-serif;font-weight:600;font-size:1.15rem;flex:1;}}
+  .section-title{{font-family:'Manrope',sans-serif;font-weight:700;font-size:1.15rem;flex:1;}}
   .section-frac{{font-family:'JetBrains Mono',monospace;font-size:0.72rem;font-weight:600;
     padding:0.18rem 0.55rem;border-radius:20px;}}
   .section-frac.pass{{background:var(--pass-soft);color:var(--pass);}}
