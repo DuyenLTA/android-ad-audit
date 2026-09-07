@@ -17,6 +17,7 @@ import streamlit as st
 
 from check_ads import (
     diff,
+    extract_key_cooccurrences,
     extract_key_value_pairs,
     extract_label_value_pairs,
     extract_values,
@@ -31,15 +32,19 @@ from package_verifier import verify_package_rows
 # line, which FOR_TESTER/VslTemplate4FirstOpenSDK never print.
 # RemoteConfigRepository catches the "ID ads inapp" placement flags (e.g.
 # `key=show_native_loading_high, value=true`), which have no dedicated tag
-# of their own -- just a generic config dump at app start. If a future app
-# needs different filter names, change this list (or use the CLI's
-# --filter flag directly for one-off apps that differ).
+# of their own -- just a generic config dump at app start. inter_ads catches
+# the interstitial high/normal price-floor decision (e.g.
+# `loadDoubleIds: canShowHigh=true (key=X), canShowNormal=true (key=Y)`),
+# which is where the mismatch-note co-occurrence hints come from for those
+# rows. If a future app needs different filter names, change this list (or
+# use the CLI's --filter flag directly for one-off apps that differ).
 FILTERS = [
     "FOR_TESTER",
     "VslTemplate4FirstOpenSDK",
     "UserMessagingPlatform",
     "AdsConsentManager",
     "RemoteConfigRepository",
+    "inter_ads",
 ]
 
 st.set_page_config(page_title="Ad Checklist Diff", page_icon="\U0001f4cb")
@@ -129,7 +134,10 @@ else:
                     trusted_values = extract_values(all_lines)
                     label_value_pairs = extract_label_value_pairs(all_lines)
                     key_value_pairs = extract_key_value_pairs(all_lines)
-                    result = diff(checklist, trusted_values, label_value_pairs, key_value_pairs)
+                    key_cooccurrences = extract_key_cooccurrences(all_lines)
+                    result = diff(
+                        checklist, trusted_values, label_value_pairs, key_value_pairs, key_cooccurrences
+                    )
                     verify_package_rows(result)
 
                     report_path = new_temp_path(suffix=".html", prefix="adcheck_report_")

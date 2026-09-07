@@ -1,6 +1,7 @@
 import check_ads
 from check_ads import (
     diff,
+    extract_key_cooccurrences,
     extract_key_value_pairs,
     extract_label_value_pairs,
     extract_values,
@@ -79,6 +80,21 @@ def test_extract_key_value_pairs_includes_both_prefixed_and_stripped_keys():
     pairs = extract_key_value_pairs(lines)
     assert pairs["show_native_loading_high"] == "false"
     assert pairs["native_loading_high"] == "false"
+
+
+def test_extract_key_cooccurrences_groups_keys_on_the_same_line():
+    lines = [
+        "... loadDoubleIds: canShowHigh=true (key=enable_401_home_a_inter_high), "
+        "canShowNormal=true (key=show_inter_feature)\n"
+    ]
+    cooccurrences = extract_key_cooccurrences(lines)
+    assert cooccurrences["show_inter_feature"] == {"enable_401_home_a_inter_high"}
+    assert cooccurrences["enable_401_home_a_inter_high"] == {"show_inter_feature"}
+
+
+def test_extract_key_cooccurrences_ignores_a_lone_key_on_a_line():
+    lines = ["... key=show_inter_feature, value=true\n"]
+    assert extract_key_cooccurrences(lines) == {}
 
 
 def test_load_trusted_lines_reports_zero_matches_per_filter(tmp_path):
@@ -221,7 +237,52 @@ def test_diff_note_shows_flag_disabled_for_key_mismatch():
     assert result["sections"]["S"][0]["note"] == "Flag có trong log nhưng đang tắt (value=false)"
 
 
-def test_diff_note_falls_back_when_nothing_derivable():
+def test_diff_note_falls_back_when_nothing_at_all_available():
     checklist = [{"section": "S", "label": "show_101", "value": "ca-app-pub-1/2"}]
     result = diff(checklist, set())
-    assert result["sections"]["S"][0]["note"] == "Không tìm thấy giá trị tương ứng nào trong log"
+    assert result["sections"]["S"][0]["note"] == "Không thấy giá trị lạ nào liên quan trong log"
+
+
+def test_diff_note_lists_leftover_ids_for_id_shaped_row():
+    checklist = [{"section": "S", "label": "show_101", "value": "ca-app-pub-1/2"}]
+    trusted_values = {"ca-app-pub-9/9"}  # an unrelated extra ID, not this row's value
+    result = diff(checklist, trusted_values)
+    assert result["sections"]["S"][0]["note"] == (
+        "Giá trị lạ thấy trong log (chưa rõ có phải cùng placement): ca-app-pub-9/9"
+    )
+
+
+def test_diff_note_lists_cooccurrence_candidates_from_matched_sibling():
+    # Mirrors the real Home/inter_feature_high case: a matched sibling row's
+    # key (show_inter_feature) co-occurs on the same log line as an
+    # unclaimed key (enable_401_home_a_inter_high) -- a targeted candidate
+    # for the row that couldn't otherwise be matched.
+    checklist = [
+        {"section": "S", "label": "Home", "value": "inter_feature"},
+        {"section": "S", "label": "Home", "value": "inter_feature_high"},
+    ]
+    result = diff(
+        checklist,
+        {"inter_feature"},
+        key_cooccurrences={"show_inter_feature": {"enable_401_home_a_inter_high"}},
+    )
+    rows = result["sections"]["S"]
+    assert rows[0]["found"] is True
+    assert rows[1]["found"] is False
+    assert rows[1]["note"] == (
+        "Giá trị lạ thấy trong log (chưa rõ có phải cùng placement): enable_401_home_a_inter_high"
+    )
+
+
+def test_diff_note_truncates_long_candidate_lists():
+    checklist = [
+        {"section": "S", "label": "Home", "value": "inter_feature"},
+        {"section": "S", "label": "Home", "value": "inter_feature_high"},
+    ]
+    many_keys = {f"key_{i}" for i in range(8)}
+    result = diff(
+        checklist, {"inter_feature"}, key_cooccurrences={"show_inter_feature": many_keys}
+    )
+    note = result["sections"]["S"][1]["note"]
+    assert note.startswith("Giá trị lạ thấy trong log")
+    assert "(+3 khác)" in note

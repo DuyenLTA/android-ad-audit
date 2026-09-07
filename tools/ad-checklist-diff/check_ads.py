@@ -15,9 +15,10 @@ import sys
 # Re-exported here so callers (streamlit_app.py, tests) keep importing
 # everything from this one module -- the split below is just to keep each
 # file under ~200 lines, not a public API change.
-from checklist_source import fetch_checklist, parse_checklist_csv, sheet_csv_url  # noqa: F401
+from checklist_source import ID_RE, fetch_checklist, parse_checklist_csv, sheet_csv_url  # noqa: F401
 from log_extractor import (  # noqa: F401
     SHOW_PREFIX,
+    extract_key_cooccurrences,
     extract_key_value_pairs,
     extract_label_value_pairs,
     extract_values,
@@ -35,14 +36,62 @@ from report_renderer import render_html  # noqa: F401
 KNOWN_ALIASES: dict[str, list[str]] = {}
 
 
-def _mismatch_note(row: dict, label_value_pairs: dict, key_value_pairs: dict) -> str:
+MAX_CANDIDATES_SHOWN = 5
+
+
+def _format_candidates(candidates: list[str]) -> str:
+    shown = candidates[:MAX_CANDIDATES_SHOWN]
+    more = f" (+{len(candidates) - MAX_CANDIDATES_SHOWN} khác)" if len(candidates) > MAX_CANDIDATES_SHOWN else ""
+    return (
+        "Giá trị lạ thấy trong log (chưa rõ có phải cùng placement): "
+        + ", ".join(shown)
+        + more
+    )
+
+
+def _cooccurrence_candidates(
+    section_rows: list[dict], key_cooccurrences: dict, checklist_values: set[str]
+) -> list[str]:
+    """Keys seen on the same log line as an already-matched sibling row in
+    this section, that aren't already claimed by any checklist row.
+
+    Narrower and far less noisy than listing every unclaimed key mentioned
+    anywhere in the whole capture (which mostly turned out to be unrelated
+    feature flags) -- a same-line co-occurrence with a *confirmed* match is
+    an actual, specific signal, not a naming-pattern guess.
+    """
+    sibling_keys = set()
+    for r in section_rows:
+        if r["found"]:
+            sibling_keys.add(r["value"])
+            sibling_keys.add(f"{SHOW_PREFIX}{r['value']}")
+
+    candidates = set()
+    for key in sibling_keys:
+        candidates.update(key_cooccurrences.get(key, set()))
+    # A candidate already claimed under its show_-prefixed form is not a new
+    # lead -- e.g. checklist value "inter_style" already matched, so its
+    # co-occurring "show_inter_style" is the same thing, not a new candidate.
+    claimed = checklist_values | {f"{SHOW_PREFIX}{v}" for v in checklist_values}
+    candidates -= claimed
+    return sorted(candidates)
+
+
+def _mismatch_note(
+    row: dict,
+    label_value_pairs: dict,
+    key_value_pairs: dict,
+    cooccurrence_candidates: list[str],
+    leftover_ids: list[str],
+) -> str:
     """Best-effort "what does the log actually show" note for a Lệch row.
 
-    Only reports something backed by an exact label or key match found in
-    the log -- never a guess based on naming similarity or line proximity
-    (that produced a false match before and was reverted). If neither
-    lookup hits, say plainly that nothing corresponding was found, rather
-    than staying silent about why.
+    Only ever presents something as a *confirmed* discrepancy when it's
+    backed by an exact label or key match in the log (naming pattern or
+    line-proximity guessing produced a false "Khớp" once already and was
+    reverted). Otherwise, falls back to listing candidate values the log
+    had that don't belong to any checklist row -- clearly framed as
+    unconfirmed, for the user to judge, never asserted as a match.
     """
     label, value = row["label"], row["value"]
     if label in label_value_pairs and label_value_pairs[label] != value:
@@ -50,7 +99,11 @@ def _mismatch_note(row: dict, label_value_pairs: dict, key_value_pairs: dict) ->
     for key in (value, f"{SHOW_PREFIX}{value}"):
         if key in key_value_pairs and key_value_pairs[key].lower() != "true":
             return f"Flag có trong log nhưng đang tắt (value={key_value_pairs[key]})"
-    return "Không tìm thấy giá trị tương ứng nào trong log"
+    if cooccurrence_candidates:
+        return _format_candidates(cooccurrence_candidates)
+    if ID_RE.fullmatch(value) and leftover_ids:
+        return _format_candidates(leftover_ids)
+    return "Không thấy giá trị lạ nào liên quan trong log"
 
 
 def diff(
@@ -58,6 +111,7 @@ def diff(
     trusted_values: set[str],
     label_value_pairs: dict | None = None,
     key_value_pairs: dict | None = None,
+    key_cooccurrences: dict | None = None,
 ) -> dict:
     """Group checklist rows by section, mark MATCH/MISSING, and find EXTRA values.
 
@@ -65,24 +119,38 @@ def diff(
     column C) or KNOWN_ALIASES entries is present -- for placement keys the
     app logs under a different internal name than the checklist uses.
 
-    label_value_pairs/key_value_pairs (from log_extractor's
-    extract_label_value_pairs/extract_key_value_pairs) are optional -- when
-    given, a mismatched row gets a "note" explaining what the log actually
-    shows for it, when that's derivable without guessing.
+    label_value_pairs/key_value_pairs/key_cooccurrences (from log_extractor's
+    extract_label_value_pairs/extract_key_value_pairs/extract_key_cooccurrences)
+    are optional -- when given, a mismatched row gets a "note" explaining
+    what the log actually shows for it, when that's derivable without
+    guessing.
     """
     label_value_pairs = label_value_pairs or {}
     key_value_pairs = key_value_pairs or {}
-    sections: dict[str, list[dict]] = {}
-    for row in checklist:
-        alts = [*row.get("alt_values", []), *KNOWN_ALIASES.get(row["value"], [])]
-        found = row["value"] in trusted_values or any(alt in trusted_values for alt in alts)
-        note = None if found else _mismatch_note(row, label_value_pairs, key_value_pairs)
-        sections.setdefault(row["section"], []).append({**row, "found": found, "note": note})
+    key_cooccurrences = key_cooccurrences or {}
 
     checklist_values = {row["value"] for row in checklist}
     checklist_values.update(alt for row in checklist for alt in row.get("alt_values", []))
     checklist_values.update(alt for alts in KNOWN_ALIASES.values() for alt in alts)
     extra = sorted(v for v in trusted_values if v not in checklist_values)
+    leftover_ids = [v for v in extra if ID_RE.fullmatch(v)]
+
+    # First pass: found status, grouped by section (a row's note may depend
+    # on a sibling row elsewhere in the same section, so this can't be done
+    # in a single pass).
+    sections: dict[str, list[dict]] = {}
+    for row in checklist:
+        alts = [*row.get("alt_values", []), *KNOWN_ALIASES.get(row["value"], [])]
+        found = row["value"] in trusted_values or any(alt in trusted_values for alt in alts)
+        sections.setdefault(row["section"], []).append({**row, "found": found, "note": None})
+
+    # Second pass: notes for mismatched rows, now that each section's full
+    # sibling set is known.
+    for section_rows in sections.values():
+        candidates = _cooccurrence_candidates(section_rows, key_cooccurrences, checklist_values)
+        for row in section_rows:
+            if not row["found"]:
+                row["note"] = _mismatch_note(row, label_value_pairs, key_value_pairs, candidates, leftover_ids)
 
     return {"sections": sections, "extra": extra}
 
@@ -130,7 +198,8 @@ def main() -> None:
     trusted_values = extract_values(all_trusted_lines)
     label_value_pairs = extract_label_value_pairs(all_trusted_lines)
     key_value_pairs = extract_key_value_pairs(all_trusted_lines)
-    result = diff(checklist, trusted_values, label_value_pairs, key_value_pairs)
+    key_cooccurrences = extract_key_cooccurrences(all_trusted_lines)
+    result = diff(checklist, trusted_values, label_value_pairs, key_value_pairs, key_cooccurrences)
 
     print_summary(result, empty_filters)
     render_html(result, empty_filters, args.out)

@@ -5,6 +5,7 @@ from checklist_source import ID_RE
 
 BRACKET_RE = re.compile(r"\[([^\]]*)\]")
 KEY_VALUE_RE = re.compile(r"key=([\w.]+),\s*value=(\w+)")
+KEY_MENTION_RE = re.compile(r"key=([\w.]+)")
 SHOW_PREFIX = "show_"
 
 
@@ -101,3 +102,26 @@ def extract_key_value_pairs(lines: list[str]) -> dict[str, str]:
             if key.startswith(SHOW_PREFIX):
                 pairs[key[len(SHOW_PREFIX):]] = flag_value
     return pairs
+
+
+def extract_key_cooccurrences(lines: list[str]) -> dict[str, set[str]]:
+    """Map each `key=X` mention to the other key= mentions on the *same log
+    line* (only lines with 2+ distinct keys count -- a lone key on a line has
+    no "buddy" to report).
+
+    This is how the Home/inter_feature_high naming mismatch was originally
+    (and correctly) spotted: a `loadDoubleIds` line logs
+    `canShowHigh=true (key=enable_401_home_a_inter_high), canShowNormal=true
+    (key=show_inter_feature)` -- once `show_inter_feature` is confirmed as
+    the matched sibling row's key, its co-occurring `enable_401_home_a_inter_high`
+    is a much more targeted FYI candidate for the mismatched row than a
+    global list of every key mentioned anywhere in the capture (which turned
+    out to be mostly unrelated feature flags, not ad placements)."""
+    cooccurrences: dict[str, set[str]] = {}
+    for line in lines:
+        keys_on_line = {m.group(1) for m in KEY_MENTION_RE.finditer(line)}
+        if len(keys_on_line) < 2:
+            continue
+        for key in keys_on_line:
+            cooccurrences.setdefault(key, set()).update(keys_on_line - {key})
+    return cooccurrences
