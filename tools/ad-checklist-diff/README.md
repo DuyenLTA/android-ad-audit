@@ -14,11 +14,17 @@ naming differs per app, values are unique.
   operate the phone yourself.
 - Does not fuzzy-match labels -- only exact value presence.
 - Cannot verify things that never appear inside a trusted (`--filter`-matched)
-  line. In the Nexus app checklist, "Package name" and the AdMob "App ID"
-  aren't printed under the `FOR_TESTER` tag family at all -- package name
-  needs `adb shell pm list packages <name>`, and the App ID line is tagged
-  `UserMessagingPlatform`/`AdsConsentManager`. Those rows will show as
-  "Thiếu" here even when correct; verify them separately.
+  line, **in the CLI**. The GUI covers the two known exceptions from the
+  Nexus app checklist instead: the AdMob "App ID" is tagged
+  `UserMessagingPlatform`/`AdsConsentManager` rather than `FOR_TESTER`, so
+  the GUI's fixed filter list includes those two tags too; "Package name"
+  never appears in any log line at all, so the GUI checks it separately via
+  `adb shell pm list packages` (any checklist value shaped like a package
+  name -- 3+ dot-separated segments -- gets this treatment automatically).
+  Running the plain CLI with only `FOR_TESTER`/`VslTemplate4FirstOpenSDK`
+  will still show both rows as "Thiếu" even when correct -- use the GUI, or
+  add `--filter UserMessagingPlatform --filter AdsConsentManager` and verify
+  the package name by hand.
 
 ## Setup
 

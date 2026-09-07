@@ -16,11 +16,19 @@ from pathlib import Path
 import streamlit as st
 
 from check_ads import diff, extract_values, fetch_checklist, load_trusted_lines, render_html
+from package_verifier import verify_package_rows
 
-# Locked to this org's two standard logcat filters -- not user-editable.
-# If a future app needs different filter names, change this list (or use
-# the CLI's --filter flag directly for one-off apps that differ).
-FILTERS = ["FOR_TESTER", "VslTemplate4FirstOpenSDK"]
+# Locked to this org's standard logcat filters -- not user-editable. The last
+# two catch the AdMob App ID's own log line, which FOR_TESTER/
+# VslTemplate4FirstOpenSDK never print. If a future app needs different
+# filter names, change this list (or use the CLI's --filter flag directly
+# for one-off apps that differ).
+FILTERS = [
+    "FOR_TESTER",
+    "VslTemplate4FirstOpenSDK",
+    "UserMessagingPlatform",
+    "AdsConsentManager",
+]
 
 st.set_page_config(page_title="Ad Checklist Diff", page_icon="\U0001f4cb")
 st.title("Ad Checklist Diff")
@@ -108,6 +116,7 @@ else:
                     all_lines = [line for lines in trusted_by_filter.values() for line in lines]
                     trusted_values = extract_values(all_lines)
                     result = diff(checklist, trusted_values)
+                    verify_package_rows(result)
 
                     report_path = new_temp_path(suffix=".html", prefix="adcheck_report_")
                     render_html(result, empty_filters, str(report_path))

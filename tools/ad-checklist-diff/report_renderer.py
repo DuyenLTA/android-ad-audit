@@ -4,7 +4,6 @@ import html
 
 def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
     sections = result["sections"]
-    extra = result["extra"]
 
     total = sum(len(rows) for rows in sections.values())
     matched = sum(1 for rows in sections.values() for r in rows if r["found"])
@@ -35,14 +34,6 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
             "<div class='callout'><h3>Filter không khớp dòng log nào trong lần capture này</h3>"
             "<p>Các dòng \"Thiếu\" liên quan tới filter này có thể chỉ vì log chưa capture đúng "
             "vùng, không hẳn là app bị lỗi thật -- capture lại rồi chạy lại trước khi kết luận.</p>"
-            f"<div class='chip-list'>{chips}</div></div>"
-        )
-
-    extra_html = ""
-    if extra:
-        chips = "".join(f"<span class='chip'>{html.escape(v)}</span>" for v in extra)
-        extra_html = (
-            "<div class='callout'><h3>Giá trị thấy trong log, không có trong sheet</h3>"
             f"<div class='chip-list'>{chips}</div></div>"
         )
 
@@ -92,7 +83,6 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
   <div class="scorecard"><div class="num">{matched} / {total}</div><div>dòng checklist khớp</div></div>
   {warning_html}
   {''.join(section_html)}
-  {extra_html}
 </div>
 """
     with open(out_path, "w", encoding="utf-8") as f:
