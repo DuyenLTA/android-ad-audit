@@ -226,7 +226,9 @@ def test_diff_note_shows_actual_logged_value_for_label_mismatch():
     result = diff(
         checklist, set(), label_value_pairs={"Adjust config token": "different_token_abc"}
     )
-    assert result["sections"]["S"][0]["note"] == "Log đang có giá trị khác: different_token_abc"
+    assert result["sections"]["S"][0]["note"] == (
+        "ID checklist đang cần: uz6fb8kyeww0. Log đang có giá trị khác: different_token_abc"
+    )
 
 
 def test_diff_note_shows_flag_disabled_for_key_mismatch():
@@ -234,13 +236,18 @@ def test_diff_note_shows_flag_disabled_for_key_mismatch():
     result = diff(
         checklist, set(), key_value_pairs={"native_loading_high": "false"}
     )
-    assert result["sections"]["S"][0]["note"] == "Flag có trong log nhưng đang tắt (value=false)"
+    assert result["sections"]["S"][0]["note"] == (
+        "ID checklist đang cần: native_loading_high. "
+        "Flag có trong log nhưng đang tắt (value=false)"
+    )
 
 
 def test_diff_note_falls_back_when_nothing_at_all_available():
     checklist = [{"section": "S", "label": "show_101", "value": "ca-app-pub-1/2"}]
     result = diff(checklist, set())
-    assert result["sections"]["S"][0]["note"] == "Không thấy giá trị lạ nào liên quan trong log"
+    assert result["sections"]["S"][0]["note"] == (
+        "ID checklist đang cần: ca-app-pub-1/2. Không thấy giá trị lạ nào liên quan trong log"
+    )
 
 
 def test_diff_note_lists_leftover_ids_for_id_shaped_row():
@@ -248,6 +255,7 @@ def test_diff_note_lists_leftover_ids_for_id_shaped_row():
     trusted_values = {"ca-app-pub-9/9"}  # an unrelated extra ID, not this row's value
     result = diff(checklist, trusted_values)
     assert result["sections"]["S"][0]["note"] == (
+        "ID checklist đang cần: ca-app-pub-1/2. "
         "Giá trị lạ thấy trong log (chưa rõ có phải cùng placement): ca-app-pub-9/9"
     )
 
@@ -270,6 +278,7 @@ def test_diff_note_lists_cooccurrence_candidates_from_matched_sibling():
     assert rows[0]["found"] is True
     assert rows[1]["found"] is False
     assert rows[1]["note"] == (
+        "ID checklist đang cần: inter_feature_high. "
         "Giá trị lạ thấy trong log (chưa rõ có phải cùng placement): enable_401_home_a_inter_high"
     )
 
@@ -284,5 +293,6 @@ def test_diff_note_truncates_long_candidate_lists():
         checklist, {"inter_feature"}, key_cooccurrences={"show_inter_feature": many_keys}
     )
     note = result["sections"]["S"][1]["note"]
-    assert note.startswith("Giá trị lạ thấy trong log")
+    assert note.startswith("ID checklist đang cần: inter_feature_high.")
+    assert "Giá trị lạ thấy trong log" in note
     assert "(+3 khác)" in note
