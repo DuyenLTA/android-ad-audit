@@ -15,7 +15,15 @@ from pathlib import Path
 
 import streamlit as st
 
-from check_ads import diff, extract_values, fetch_checklist, load_trusted_lines, render_html
+from check_ads import (
+    diff,
+    extract_key_value_pairs,
+    extract_label_value_pairs,
+    extract_values,
+    fetch_checklist,
+    load_trusted_lines,
+    render_html,
+)
 from package_verifier import verify_package_rows
 
 # Locked to this org's standard logcat filters -- not user-editable.
@@ -119,7 +127,9 @@ else:
                     empty_filters = [f for f, lines in trusted_by_filter.items() if not lines]
                     all_lines = [line for lines in trusted_by_filter.values() for line in lines]
                     trusted_values = extract_values(all_lines)
-                    result = diff(checklist, trusted_values)
+                    label_value_pairs = extract_label_value_pairs(all_lines)
+                    key_value_pairs = extract_key_value_pairs(all_lines)
+                    result = diff(checklist, trusted_values, label_value_pairs, key_value_pairs)
                     verify_package_rows(result)
 
                     report_path = new_temp_path(suffix=".html", prefix="adcheck_report_")

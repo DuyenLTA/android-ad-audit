@@ -1,5 +1,13 @@
 import check_ads
-from check_ads import diff, extract_values, load_trusted_lines, parse_checklist_csv, sheet_csv_url
+from check_ads import (
+    diff,
+    extract_key_value_pairs,
+    extract_label_value_pairs,
+    extract_values,
+    load_trusted_lines,
+    parse_checklist_csv,
+    sheet_csv_url,
+)
 
 
 def test_extract_values_trailing_colon_shape():
@@ -46,6 +54,31 @@ def test_extract_values_remote_config_key_without_show_prefix_not_stripped():
     values = extract_values(lines)
     assert "enable_401_home_a_inter_high" in values
     assert "enable_401_home_a_inter" not in values  # only a literal show_ prefix is stripped
+
+
+def test_extract_values_remote_config_key_false_is_not_a_match():
+    lines = ["... key=show_native_loading_high, value=false\n"]
+    values = extract_values(lines)
+    assert "show_native_loading_high" not in values
+    assert "native_loading_high" not in values
+
+
+def test_extract_label_value_pairs():
+    lines = ["08-29 23:45:48.584 20978 20978 I FOR_TESTER_CONFIG: Adjust config token: uz6fb8kyeww0\n"]
+    assert extract_label_value_pairs(lines) == {"Adjust config token": "uz6fb8kyeww0"}
+
+
+def test_extract_label_value_pairs_ignores_lines_without_a_separate_label():
+    # Only tag+value, no ": "-separated label in between -- nothing to key off.
+    lines = ["... Received app ID: `ca-app-pub-4973559944609228~7143022911`.\n"]
+    assert extract_label_value_pairs(lines) == {}
+
+
+def test_extract_key_value_pairs_includes_both_prefixed_and_stripped_keys():
+    lines = ["... key=show_native_loading_high, value=false\n"]
+    pairs = extract_key_value_pairs(lines)
+    assert pairs["show_native_loading_high"] == "false"
+    assert pairs["native_loading_high"] == "false"
 
 
 def test_load_trusted_lines_reports_zero_matches_per_filter(tmp_path):
@@ -164,3 +197,31 @@ def test_diff_alt_values_excluded_from_extra():
     ]
     result = diff(checklist, {"enable_401_home_a_inter_high"})
     assert result["extra"] == []
+
+
+def test_diff_matched_row_has_no_note():
+    checklist = [{"section": "S", "label": "a", "value": "111"}]
+    result = diff(checklist, {"111"})
+    assert result["sections"]["S"][0]["note"] is None
+
+
+def test_diff_note_shows_actual_logged_value_for_label_mismatch():
+    checklist = [{"section": "S", "label": "Adjust config token", "value": "uz6fb8kyeww0"}]
+    result = diff(
+        checklist, set(), label_value_pairs={"Adjust config token": "different_token_abc"}
+    )
+    assert result["sections"]["S"][0]["note"] == "Log đang có giá trị khác: different_token_abc"
+
+
+def test_diff_note_shows_flag_disabled_for_key_mismatch():
+    checklist = [{"section": "S", "label": "Loading", "value": "native_loading_high"}]
+    result = diff(
+        checklist, set(), key_value_pairs={"native_loading_high": "false"}
+    )
+    assert result["sections"]["S"][0]["note"] == "Flag có trong log nhưng đang tắt (value=false)"
+
+
+def test_diff_note_falls_back_when_nothing_derivable():
+    checklist = [{"section": "S", "label": "show_101", "value": "ca-app-pub-1/2"}]
+    result = diff(checklist, set())
+    assert result["sections"]["S"][0]["note"] == "Không tìm thấy giá trị tương ứng nào trong log"

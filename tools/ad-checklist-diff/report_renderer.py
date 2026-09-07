@@ -15,10 +15,14 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
         for r in rows:
             status = "pass" if r["found"] else "fail"
             label_txt = "Khớp" if r["found"] else "Lệch"
+            note_html = (
+                f"<div class='note'>{html.escape(r['note'])}</div>" if r.get("note") else ""
+            )
             row_html.append(
                 f"<tr><td class='cell-label'>{html.escape(r['label'])}</td>"
                 f"<td class='cell-mono'>{html.escape(r['value'])}</td>"
-                f"<td><span class='status {status}'><span class='dot'></span>{label_txt}</span></td></tr>"
+                f"<td><span class='status {status}'><span class='dot'></span>{label_txt}</span>"
+                f"{note_html}</td></tr>"
             )
         section_html.append(
             f"<section><div class='section-head'><h2>{html.escape(name)}</h2>"
@@ -72,6 +76,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
   .status.pass{{background:var(--pass-soft);color:var(--pass);}}
   .status.fail{{background:var(--fail-soft);color:var(--fail);}}
   .status .dot{{width:6px;height:6px;border-radius:50%;background:currentColor;}}
+  .note{{margin-top:0.3rem;font-size:0.78rem;color:var(--ink-soft);}}
   .callout{{border:1px solid var(--line);border-left:3px solid var(--pending);background:var(--pending-soft);
     border-radius:0 8px 8px 0;padding:1rem 1.25rem;}}
   .chip-list{{display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.5rem;}}

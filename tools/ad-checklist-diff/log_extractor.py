@@ -4,7 +4,7 @@ import re
 from checklist_source import ID_RE
 
 BRACKET_RE = re.compile(r"\[([^\]]*)\]")
-KEY_VALUE_RE = re.compile(r"key=([\w.]+)")
+KEY_VALUE_RE = re.compile(r"key=([\w.]+),\s*value=(\w+)")
 SHOW_PREFIX = "show_"
 
 
@@ -36,7 +36,8 @@ def extract_values(lines: list[str]) -> set[str]:
       3. `... ca-app-pub-123/456 ...` anywhere in line -> AdMob app/unit IDs
       4. `RemoteConfigRepository: key=show_native_loading_high, value=true`
          -> remote-config flag key, both as printed and with a leading
-         `show_` stripped (checklist placement keys are written without it)
+         `show_` stripped (checklist placement keys are written without it).
+         Only counts when value=true -- a flag logged as false is not a match.
     """
     values = set()
     for line in lines:
@@ -50,7 +51,9 @@ def extract_values(lines: list[str]) -> set[str]:
                     values.add(item)
 
         for m in KEY_VALUE_RE.finditer(line):
-            key = m.group(1)
+            key, flag_value = m.group(1), m.group(2)
+            if flag_value.lower() != "true":
+                continue
             values.add(key)
             if key.startswith(SHOW_PREFIX):
                 values.add(key[len(SHOW_PREFIX):])
@@ -64,3 +67,37 @@ def extract_values(lines: list[str]) -> set[str]:
             if tail and not tail.startswith("["):
                 values.add(tail)
     return values
+
+
+def extract_label_value_pairs(lines: list[str]) -> dict[str, str]:
+    """Map label -> actual logged value for `... TAG: <Label>: <value>` lines.
+
+    Only meaningful for checklist rows whose label is itself a human-readable
+    description (Adjust/Facebook config in section 1) that the app logs
+    verbatim -- used to show what the log *actually* has for a mismatched
+    row, instead of only "not found". A line needs 3+ ": "-separated parts
+    (tag, label, value) to count -- fewer than that means there's no
+    separate label to key off, only a bare tag+value.
+    """
+    pairs: dict[str, str] = {}
+    for line in lines:
+        parts = line.rstrip("\n").split(": ")
+        if len(parts) >= 3:
+            label, value = parts[-2].strip(), parts[-1].strip()
+            if label and value:
+                pairs[label] = value
+    return pairs
+
+
+def extract_key_value_pairs(lines: list[str]) -> dict[str, str]:
+    """Map remote-config flag key -> its logged true/false value (both the
+    raw key and, if prefixed, the `show_`-stripped form) -- lets a mismatched
+    row report "flag exists but is false" instead of only "not found"."""
+    pairs: dict[str, str] = {}
+    for line in lines:
+        for m in KEY_VALUE_RE.finditer(line):
+            key, flag_value = m.group(1), m.group(2)
+            pairs[key] = flag_value
+            if key.startswith(SHOW_PREFIX):
+                pairs[key[len(SHOW_PREFIX):]] = flag_value
+    return pairs

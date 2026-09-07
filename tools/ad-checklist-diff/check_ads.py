@@ -16,7 +16,13 @@ import sys
 # everything from this one module -- the split below is just to keep each
 # file under ~200 lines, not a public API change.
 from checklist_source import fetch_checklist, parse_checklist_csv, sheet_csv_url  # noqa: F401
-from log_extractor import extract_values, load_trusted_lines  # noqa: F401
+from log_extractor import (  # noqa: F401
+    SHOW_PREFIX,
+    extract_key_value_pairs,
+    extract_label_value_pairs,
+    extract_values,
+    load_trusted_lines,
+)
 from report_renderer import render_html  # noqa: F401
 
 # Confirmed one-off naming mismatches between a checklist value and the
@@ -29,18 +35,49 @@ from report_renderer import render_html  # noqa: F401
 KNOWN_ALIASES: dict[str, list[str]] = {}
 
 
-def diff(checklist: list[dict], trusted_values: set[str]) -> dict:
+def _mismatch_note(row: dict, label_value_pairs: dict, key_value_pairs: dict) -> str:
+    """Best-effort "what does the log actually show" note for a Lệch row.
+
+    Only reports something backed by an exact label or key match found in
+    the log -- never a guess based on naming similarity or line proximity
+    (that produced a false match before and was reverted). If neither
+    lookup hits, say plainly that nothing corresponding was found, rather
+    than staying silent about why.
+    """
+    label, value = row["label"], row["value"]
+    if label in label_value_pairs and label_value_pairs[label] != value:
+        return f"Log đang có giá trị khác: {label_value_pairs[label]}"
+    for key in (value, f"{SHOW_PREFIX}{value}"):
+        if key in key_value_pairs and key_value_pairs[key].lower() != "true":
+            return f"Flag có trong log nhưng đang tắt (value={key_value_pairs[key]})"
+    return "Không tìm thấy giá trị tương ứng nào trong log"
+
+
+def diff(
+    checklist: list[dict],
+    trusted_values: set[str],
+    label_value_pairs: dict | None = None,
+    key_value_pairs: dict | None = None,
+) -> dict:
     """Group checklist rows by section, mark MATCH/MISSING, and find EXTRA values.
 
     A row also counts as found if any of its optional alt_values (sheet
     column C) or KNOWN_ALIASES entries is present -- for placement keys the
     app logs under a different internal name than the checklist uses.
+
+    label_value_pairs/key_value_pairs (from log_extractor's
+    extract_label_value_pairs/extract_key_value_pairs) are optional -- when
+    given, a mismatched row gets a "note" explaining what the log actually
+    shows for it, when that's derivable without guessing.
     """
+    label_value_pairs = label_value_pairs or {}
+    key_value_pairs = key_value_pairs or {}
     sections: dict[str, list[dict]] = {}
     for row in checklist:
         alts = [*row.get("alt_values", []), *KNOWN_ALIASES.get(row["value"], [])]
         found = row["value"] in trusted_values or any(alt in trusted_values for alt in alts)
-        sections.setdefault(row["section"], []).append({**row, "found": found})
+        note = None if found else _mismatch_note(row, label_value_pairs, key_value_pairs)
+        sections.setdefault(row["section"], []).append({**row, "found": found, "note": note})
 
     checklist_values = {row["value"] for row in checklist}
     checklist_values.update(alt for row in checklist for alt in row.get("alt_values", []))
@@ -91,7 +128,9 @@ def main() -> None:
     empty_filters = [f for f, lines in trusted_by_filter.items() if not lines]
     all_trusted_lines = [line for lines in trusted_by_filter.values() for line in lines]
     trusted_values = extract_values(all_trusted_lines)
-    result = diff(checklist, trusted_values)
+    label_value_pairs = extract_label_value_pairs(all_trusted_lines)
+    key_value_pairs = extract_key_value_pairs(all_trusted_lines)
+    result = diff(checklist, trusted_values, label_value_pairs, key_value_pairs)
 
     print_summary(result, empty_filters)
     render_html(result, empty_filters, args.out)

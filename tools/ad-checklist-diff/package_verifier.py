@@ -45,3 +45,4 @@ def verify_package_rows(result: dict, installed_packages_fn=installed_packages) 
         return
     for r in package_rows:
         r["found"] = r["value"] in installed
+        r["note"] = None if r["found"] else "Đã kiểm tra qua adb -- package chưa cài trên máy"
