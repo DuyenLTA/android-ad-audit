@@ -4,6 +4,9 @@ Diff a Google Sheet ad/config checklist against a captured Android `logcat`
 file. Matches by **value** (token, ad unit ID), not by label -- placement
 naming differs per app, values are unique.
 
+Full usage guide (overview, install, GUI/CLI walkthrough, troubleshooting):
+https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
+
 ## What this does NOT do
 
 - `check_ads.py` (the CLI) does not touch a device or run `adb` in any way --
@@ -12,19 +15,17 @@ naming differs per app, values are unique.
   see below -- but neither ever triggers the app's own debug/tester log dump
   (tapping the splash logo, navigating onboarding, etc). You still have to
   operate the phone yourself.
-- Does not fuzzy-match labels -- only exact value presence.
+- Does not fuzzy-match labels -- only exact value presence, plus the
+  narrowly-scoped fallbacks documented under "Reading the result" below.
 - Cannot verify things that never appear inside a trusted (`--filter`-matched)
-  line, **in the CLI**. The GUI covers the two known exceptions from the
-  Nexus app checklist instead: the AdMob "App ID" is tagged
-  `UserMessagingPlatform`/`AdsConsentManager` rather than `FOR_TESTER`, so
-  the GUI's fixed filter list includes those two tags too; "Package name"
-  never appears in any log line at all, so the GUI checks it separately via
-  `adb shell pm list packages` (any checklist value shaped like a package
-  name -- 3+ dot-separated segments -- gets this treatment automatically).
-  Running the plain CLI with only `FOR_TESTER`/`VslTemplate4FirstOpenSDK`
-  will still show both rows as "Lệch" even when correct -- use the GUI, or
-  add `--filter UserMessagingPlatform --filter AdsConsentManager` and verify
-  the package name by hand.
+  line, **in the CLI**. The GUI's fixed filter list (`FOR_TESTER`,
+  `VslTemplate4FirstOpenSDK`, `UserMessagingPlatform`, `AdsConsentManager`,
+  `RemoteConfigRepository`, `inter_ads`) covers every area the Nexus app
+  checklist needs; a plain CLI run with only the first two will still show
+  the App ID, Package name, and "ID ads inapp" rows as "Lệch" even when
+  correct -- use the GUI, or add the extra `--filter` values by hand.
+- Package name is verified separately via `adb shell pm list packages`
+  (GUI only) since it's never printed in any log line at all.
 
 ## Setup
 
@@ -38,19 +39,16 @@ pip install requests streamlit   # streamlit only needed for the GUI
 streamlit run streamlit_app.py
 ```
 
-Opens a local page in your browser: paste the sheet URL, list your filters
-(one per line), click **Start**. It clears the logcat buffer and starts
-capturing in the background -- go operate the phone (open the app, walk
-through to home). Click **Stop** when done; the report renders inline on
-the same page, and is also saved as a local HTML file (path shown on
-screen). This is a **local** app -- it is not a shareable web link. If you
-want a shareable link, ask Claude to publish the saved report file as an
-artifact in a chat turn.
-
-One Start/Stop pass covers every `--filter` you listed at once, as long as
-whatever you did on the phone during that pass actually exercises all of
-them (e.g. going all the way to home covers both a splash-time filter and a
-first-open filter in a single capture).
+Opens a local page in your browser: paste the sheet URL, click **Start**.
+Filters are fixed (not editable) -- shown as chips. It clears the logcat
+buffer and starts capturing in the background -- go operate the phone (open
+the app, walk through onboarding, go to home; pause a couple seconds per
+screen rather than rushing, some placements only preload after their
+`_high` sibling finishes). Click **Stop** when done; a per-section score
+summary appears immediately, with a full-width button to open the report
+in a new tab and an expander to preview it inline. This is a **local** app
+-- it is not a shareable web link. If you want a shareable link, ask Claude
+to publish the saved report file as an artifact in a chat turn.
 
 If you close the browser tab (or refresh it) mid-capture instead of
 clicking Stop, the `adb logcat` process keeps running orphaned in the
@@ -69,9 +67,8 @@ adb logcat -c
 adb logcat > capture.log
 ```
 
-(Ctrl+C to stop once you've triggered what you need -- e.g. spam-tapped the
-splash logo for a config dump, or run through onboarding for first-open ad
-IDs.) One capture file can cover multiple `--filter` values in one run.
+(Ctrl+C to stop once you've triggered what you need.) One capture file can
+cover multiple `--filter` values in one run.
 
 ### 2. Run the diff
 
@@ -81,6 +78,10 @@ python check_ads.py \
   --log capture.log \
   --filter FOR_TESTER \
   --filter VslTemplate4FirstOpenSDK \
+  --filter UserMessagingPlatform \
+  --filter AdsConsentManager \
+  --filter RemoteConfigRepository \
+  --filter inter_ads \
   --out report.html
 ```
 
@@ -97,6 +98,17 @@ once per checklist area you captured this run.
   that area at all, so any "Lệch" rows in that area might just be
   uncaptured, not actually broken. Capture again with the right filter/flow
   before trusting those rows.
+- Every "Lệch" (mismatch) row gets a short note explaining what's actually
+  in the log for it, prefixed with the checklist's own expected ID for
+  direct comparison:
+  - An exact label match with a different value -> the log's actual value.
+  - A remote-config flag present but `value=false` -> says so explicitly.
+  - A key seen on the *same log line* as an already-matched sibling row ->
+    listed as an unconfirmed candidate (never asserted as a match -- a
+    naming-pattern guess produced a false "Khớp" once and was reverted;
+    only same-line co-occurrence with a confirmed match counts now).
+  - Otherwise -> "không thấy ID lệch nào tương ứng trong log" (nothing
+    found), rather than staying silent.
 - `report.html` (or the equivalent GUI output) is the same info as a
   browsable report.
 
