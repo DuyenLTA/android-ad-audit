@@ -25,7 +25,8 @@ from check_ads import (
     load_trusted_lines,
     render_html,
 )
-from package_verifier import verify_package_rows
+from apk_verifier import verify_apk_rows
+from package_verifier import is_package_name, verify_package_rows
 
 # Locked to this org's standard logcat filters -- not user-editable.
 # UserMessagingPlatform/AdsConsentManager catch the AdMob App ID's own log
@@ -99,6 +100,40 @@ def new_temp_path(suffix: str, prefix: str) -> Path:
     return Path(path)
 
 
+# Reports must be reachable over the same http:// origin as this page.
+# A browser refuses to navigate from an http:// page to a file:// URL
+# (it lands on about:blank#blocked), so the report cannot live in the
+# system temp dir -- it goes in ./static, which Streamlit serves at
+# /app/static/ when server.enableStaticServing is on (.streamlit/config.toml).
+STATIC_DIR = Path(__file__).parent / "static"
+STATIC_URL_PREFIX = "/app/static"
+
+
+def new_report_path() -> Path:
+    """Fresh report file under ./static, older reports pruned.
+
+    Only the newest report is ever linked, so previous ones are dead
+    weight -- clear them out rather than filling the repo dir over time.
+    """
+    STATIC_DIR.mkdir(exist_ok=True)
+    for stale in STATIC_DIR.glob("adcheck_report_*.html"):
+        stale.unlink(missing_ok=True)
+    fd, path = tempfile.mkstemp(
+        suffix=".html", prefix="adcheck_report_", dir=str(STATIC_DIR)
+    )
+    os.close(fd)
+    return Path(path)
+
+
+def _checklist_package(result: dict) -> str | None:
+    """The package name the checklist declares -- the APK to read the App ID from."""
+    for rows in result["sections"].values():
+        for row in rows:
+            if is_package_name(row["value"]):
+                return row["value"]
+    return None
+
+
 capturing = st.session_state.capture_proc is not None
 
 with st.container(border=True):
@@ -161,8 +196,12 @@ with st.container(border=True):
                             checklist, trusted_values, label_value_pairs, key_value_pairs, key_cooccurrences
                         )
                         verify_package_rows(result)
+                        # App ID and the ad unit IDs of placements this
+                        # capture never exercised have no log line to grep --
+                        # read them off the installed APK instead.
+                        verify_apk_rows(result, _checklist_package(result))
 
-                        report_path = new_temp_path(suffix=".html", prefix="adcheck_report_")
+                        report_path = new_report_path()
                         render_html(result, empty_filters, str(report_path))
                 except SystemExit as e:
                     # check_ads' pipeline functions signal user-facing errors
@@ -204,7 +243,7 @@ if not capturing and st.session_state.get("last_result"):
 
     st.link_button(
         "\U0001f5a5️ Mở report toàn màn hình",
-        report_path.resolve().as_uri(),
+        f"{STATIC_URL_PREFIX}/{report_path.name}",
         type="primary",
         use_container_width=True,
     )

@@ -1,0 +1,5 @@
+[server]
+# Serves ./static at /app/static/ so the generated report opens over the
+# same http:// origin as the app. Without this the report can only be
+# reached as a file:// URL, which browsers block from an http:// page.
+enableStaticServing = true

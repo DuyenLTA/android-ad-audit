@@ -60,6 +60,20 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
             f"<div class='chip-list'>{chips}</div></div>"
         )
 
+    leftover_html = ""
+    leftover_ids = result.get("leftover_ids") or []
+    if leftover_ids:
+        items = "".join(f"<li><code>{html.escape(i)}</code></li>" for i in leftover_ids)
+        leftover_html = (
+            "<details class='callout callout-info'><summary><h3>"
+            f"{len(leftover_ids)} ID quảng cáo có trong log nhưng không có trong checklist"
+            "</h3></summary>"
+            "<p>Danh sách này tính trên <strong>cả lần capture</strong>, không thuộc riêng dòng "
+            "nào -- app có thể dùng thêm placement ngoài checklist, hoặc một dòng \"Lệch\" đang "
+            "chạy ID nào trong đây. Tự đối chiếu, tool không đoán dòng nào ứng với ID nào.</p>"
+            f"<ul class='leftover-list'>{items}</ul></details>"
+        )
+
     page = f"""<title>Ad Checklist Diff</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -153,6 +167,12 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
   .status .dot{{width:6px;height:6px;border-radius:50%;background:currentColor;}}
   .note{{margin-top:0.4rem;font-family:'JetBrains Mono',monospace;font-size:0.76rem;color:var(--ink-soft);
     max-width:52ch;}}
+  .callout-info{{border-left-color:var(--accent);background:var(--accent-soft);}}
+  .callout-info summary{{cursor:pointer;}}
+  .callout-info summary h3{{display:inline;}}
+  .leftover-list{{margin:0.6rem 0 0;padding-left:1.2rem;columns:2;column-gap:1.4rem;}}
+  .leftover-list li{{margin-bottom:0.25rem;font-size:0.82rem;}}
+  @media (max-width:640px){{.leftover-list{{columns:1;}}}}
 </style>
 <div class="wrap">
   <header class="report-head">
@@ -165,6 +185,7 @@ def render_html(result: dict, empty_filters: list[str], out_path: str) -> None:
     <div class="section-chips">{''.join(chip_html)}</div>
   </header>
   {warning_html}
+  {leftover_html}
   <div class="sections">
     {''.join(section_html)}
   </div>

@@ -249,16 +249,6 @@ def test_diff_note_falls_back_when_nothing_at_all_available():
     )
 
 
-def test_diff_note_lists_leftover_ids_for_id_shaped_row():
-    checklist = [{"section": "S", "label": "show_101", "value": "ca-app-pub-1/2"}]
-    trusted_values = {"ca-app-pub-9/9"}  # an unrelated extra ID, not this row's value
-    result = diff(checklist, trusted_values)
-    assert result["sections"]["S"][0]["note"] == (
-        "ID checklist: ca-app-pub-1/2 (lệch) -- ID lệch thấy trong log: ca-app-pub-9/9 "
-        "(chưa rõ có phải cùng placement, cần tự đối chiếu)"
-    )
-
-
 def test_diff_note_lists_cooccurrence_candidates_from_matched_sibling():
     # Mirrors the real Home/inter_feature_high case: a matched sibling row's
     # key (show_inter_feature) co-occurs on the same log line as an
@@ -280,6 +270,68 @@ def test_diff_note_lists_cooccurrence_candidates_from_matched_sibling():
         "ID checklist: inter_feature_high (lệch) -- ID lệch thấy trong log: "
         "enable_401_home_a_inter_high (chưa rõ có phải cùng placement, cần tự đối chiếu)"
     )
+
+
+def test_diff_note_keeps_cooccurrence_candidate_off_unrelated_rows():
+    # A candidate key found beside a matched interstitial belongs to that
+    # interstitial's own high/normal twin -- not to every mismatched row in
+    # the section. Regression: an interstitial-Home key was being listed as
+    # a lead under unrelated native rows (loading, uninstall, ...), sending
+    # QA to check placements it had nothing to do with.
+    checklist = [
+        {"section": "S", "label": "Home", "value": "inter_feature"},
+        {"section": "S", "label": "Home", "value": "inter_feature_high"},
+        {"section": "S", "label": "Loading", "value": "native_loading"},
+        {"section": "S", "label": "Loading", "value": "native_loading_high"},
+    ]
+    result = diff(
+        checklist,
+        {"inter_feature"},
+        key_cooccurrences={"show_inter_feature": {"enable_401_home_a_inter_high"}},
+    )
+    by_value = {r["value"]: r for r in result["sections"]["S"]}
+
+    assert "enable_401_home_a_inter_high" in by_value["inter_feature_high"]["note"]
+    for unrelated in ("native_loading", "native_loading_high"):
+        assert by_value[unrelated]["note"] == (
+            f"ID checklist: {unrelated} (lệch) -- không thấy ID lệch nào tương ứng trong log"
+        )
+
+
+def test_diff_note_drops_cooccurrence_candidate_when_twin_already_matched():
+    # Both halves of the pair matched, so the co-occurring key is not a lead
+    # for anything in this section -- it must not fall through to some other
+    # mismatched row.
+    checklist = [
+        {"section": "S", "label": "Home", "value": "inter_feature"},
+        {"section": "S", "label": "Home", "value": "inter_feature_high"},
+        {"section": "S", "label": "Loading", "value": "native_loading"},
+    ]
+    result = diff(
+        checklist,
+        {"inter_feature", "inter_feature_high"},
+        key_cooccurrences={"show_inter_feature": {"enable_401_home_a_inter_high"}},
+    )
+    by_value = {r["value"]: r for r in result["sections"]["S"]}
+    assert "enable_401_home_a_inter_high" not in by_value["native_loading"]["note"]
+
+
+def test_diff_keeps_capture_wide_leftover_ids_out_of_row_notes():
+    # Regression: unclaimed ad unit IDs from the whole capture were pasted
+    # under every unmatched ID row -- the same three IDs appeared under
+    # unrelated placements and under the App ID row, reading as a per-row
+    # finding they never were. They belong to the run, not to a row.
+    checklist = [
+        {"section": "S", "label": "Onb4", "value": "ca-app-pub-1/1111"},
+        {"section": "S", "label": "App ID", "value": "ca-app-pub-1~2222"},
+    ]
+    result = diff(checklist, {"ca-app-pub-1/9999", "ca-app-pub-1/8888"})
+
+    for row in result["sections"]["S"]:
+        assert row["note"] == (
+            f"ID checklist: {row['value']} (lệch) -- không thấy ID lệch nào tương ứng trong log"
+        )
+    assert result["leftover_ids"] == ["ca-app-pub-1/8888", "ca-app-pub-1/9999"]
 
 
 def test_diff_note_truncates_long_candidate_lists():

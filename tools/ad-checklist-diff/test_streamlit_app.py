@@ -51,7 +51,9 @@ def test_start_stop_lifecycle_with_real_device():
     at.button(key="stop_btn").click().run(timeout=20)  # includes a real network fetch of the sheet
     assert at.session_state["capture_proc"] is None
     assert not at.exception
-    assert at.get("link_button")[0].url.startswith("file://")
+    # Report must be linked over the app's own http origin -- a file://
+    # URL is blocked by the browser when navigated to from an http page.
+    assert at.get("link_button")[0].url.startswith("/app/static/")
 
 
 def test_stop_with_invalid_sheet_url_shows_clean_error(tmp_path):

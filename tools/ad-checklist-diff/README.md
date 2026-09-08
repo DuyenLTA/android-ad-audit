@@ -26,6 +26,22 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   correct -- use the GUI, or add the extra `--filter` values by hand.
 - Package name is verified separately via `adb shell pm list packages`
   (GUI only) since it's never printed in any log line at all.
+- The AdMob **App ID** and the ad unit IDs of placements a capture never
+  exercised are verified against the **installed APK** instead (GUI only):
+  some apps never print the App ID to logcat, and an ad unit ID only reaches
+  logcat when the app actually requests that placement -- which used to mean
+  walking every screen, including flows like an uninstall survey that are
+  impractical to trigger. An APK match is labelled as such in the report: it
+  proves the build contains the ID, *not* that the placement is enabled or
+  that the screen is wired to it. A row already confirmed in the log keeps its
+  log verdict. Reading the App ID needs `aapt2` from the Android SDK
+  build-tools; ad unit IDs need no extra tooling. The pulled APK is cached
+  under `~/.cache/ad-checklist-diff/<package>-<versionCode>.apk` and reused
+  until the app is updated, so only the first run per build pays the pull.
+- Ad unit IDs found in the log but belonging to no checklist row are listed
+  **once** per run in the report, not under individual rows -- that list is
+  capture-wide, and pasting it under a row read as a per-row finding it never
+  was.
 
 ## Setup
 

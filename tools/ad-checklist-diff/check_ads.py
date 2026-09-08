@@ -35,6 +35,10 @@ from report_renderer import render_html  # noqa: F401
 # produces a false "Khớp".
 KNOWN_ALIASES: dict[str, list[str]] = {}
 
+# Placement keys come in high/normal price-floor pairs, logged together on
+# one `loadDoubleIds` line.
+HIGH_SUFFIX = "_high"
+
 
 MAX_CANDIDATES_SHOWN = 5
 
@@ -50,32 +54,44 @@ def _format_candidates(expected: str, candidates: list[str]) -> str:
     )
 
 
+def _twin_value(value: str) -> str:
+    """The other half of a placement's high/normal price-floor pair."""
+    if value.endswith(HIGH_SUFFIX):
+        return value[: -len(HIGH_SUFFIX)]
+    return f"{value}{HIGH_SUFFIX}"
+
+
 def _cooccurrence_candidates(
     section_rows: list[dict], key_cooccurrences: dict, checklist_values: set[str]
-) -> list[str]:
-    """Keys seen on the same log line as an already-matched sibling row in
-    this section, that aren't already claimed by any checklist row.
+) -> dict[str, list[str]]:
+    """Candidate keys per mismatched row, keyed by that row's checklist value.
 
-    Narrower and far less noisy than listing every unclaimed key mentioned
-    anywhere in the whole capture (which mostly turned out to be unrelated
-    feature flags) -- a same-line co-occurrence with a *confirmed* match is
-    an actual, specific signal, not a naming-pattern guess.
+    A same-line co-occurrence with a *confirmed* match is an actual signal,
+    not a naming-pattern guess -- but it belongs to one specific row, not to
+    the whole section. `loadDoubleIds` prints a placement's high/normal pair
+    together (`canShowHigh=true (key=A), canShowNormal=true (key=B)`), so
+    when B matched and A is unclaimed, A is a lead for B's *twin* row only.
+    Spreading it across every mismatched row in the section instead filed an
+    interstitial-Home key under unrelated native rows, sending QA to check
+    placements the key had nothing to do with.
     """
-    sibling_keys = set()
-    for r in section_rows:
-        if r["found"]:
-            sibling_keys.add(r["value"])
-            sibling_keys.add(f"{SHOW_PREFIX}{r['value']}")
-
-    candidates = set()
-    for key in sibling_keys:
-        candidates.update(key_cooccurrences.get(key, set()))
+    unmatched = {r["value"] for r in section_rows if not r["found"]}
     # A candidate already claimed under its show_-prefixed form is not a new
     # lead -- e.g. checklist value "inter_style" already matched, so its
     # co-occurring "show_inter_style" is the same thing, not a new candidate.
     claimed = checklist_values | {f"{SHOW_PREFIX}{v}" for v in checklist_values}
-    candidates -= claimed
-    return sorted(candidates)
+
+    candidates: dict[str, set[str]] = {}
+    for row in section_rows:
+        if not row["found"]:
+            continue
+        twin = _twin_value(row["value"])
+        if twin not in unmatched:
+            continue
+        for key in (row["value"], f"{SHOW_PREFIX}{row['value']}"):
+            candidates.setdefault(twin, set()).update(key_cooccurrences.get(key, set()))
+
+    return {value: sorted(keys - claimed) for value, keys in candidates.items() if keys - claimed}
 
 
 def _mismatch_note(
@@ -83,16 +99,20 @@ def _mismatch_note(
     label_value_pairs: dict,
     key_value_pairs: dict,
     cooccurrence_candidates: list[str],
-    leftover_ids: list[str],
 ) -> str:
     """Best-effort "what does the log actually show" note for a Lệch row.
 
     Only ever presents something as a *confirmed* discrepancy when it's
     backed by an exact label or key match in the log (naming pattern or
     line-proximity guessing produced a false "Khớp" once already and was
-    reverted). Otherwise, falls back to listing candidate values the log
-    had that don't belong to any checklist row -- clearly framed as
-    unconfirmed, for the user to judge, never asserted as a match.
+    reverted), or by a same-line co-occurrence tied to this row's own
+    high/normal twin.
+
+    Unclaimed ad unit IDs from the capture are deliberately NOT offered here:
+    that list is capture-wide, so pasting it under a row implied a per-row
+    finding it never was -- the same three IDs showed up under unrelated
+    placements and under the App ID row alike. They are reported once for the
+    whole run instead (diff()'s "leftover_ids").
     """
     label, value = row["label"], row["value"]
     if label in label_value_pairs and label_value_pairs[label] != value:
@@ -105,8 +125,6 @@ def _mismatch_note(
             )
     if cooccurrence_candidates:
         return _format_candidates(value, cooccurrence_candidates)
-    if ID_RE.fullmatch(value) and leftover_ids:
-        return _format_candidates(value, leftover_ids)
     return f"ID checklist: {value} (lệch) -- không thấy ID lệch nào tương ứng trong log"
 
 
@@ -154,9 +172,11 @@ def diff(
         candidates = _cooccurrence_candidates(section_rows, key_cooccurrences, checklist_values)
         for row in section_rows:
             if not row["found"]:
-                row["note"] = _mismatch_note(row, label_value_pairs, key_value_pairs, candidates, leftover_ids)
+                row["note"] = _mismatch_note(
+                    row, label_value_pairs, key_value_pairs, candidates.get(row["value"], [])
+                )
 
-    return {"sections": sections, "extra": extra}
+    return {"sections": sections, "extra": extra, "leftover_ids": leftover_ids}
 
 
 def print_summary(result: dict, empty_filters: list[str]) -> None:
