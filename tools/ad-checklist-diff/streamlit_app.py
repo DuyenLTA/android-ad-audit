@@ -26,6 +26,7 @@ from check_ads import (
     render_html,
 )
 from apk_verifier import verify_apk_rows
+from artifact_link import is_stale, read_link
 from package_verifier import is_package_name, verify_package_rows
 
 # Locked to this org's standard logcat filters -- not user-editable.
@@ -109,20 +110,19 @@ STATIC_DIR = Path(__file__).parent / "static"
 STATIC_URL_PREFIX = "/app/static"
 
 
-def new_report_path() -> Path:
-    """Fresh report file under ./static, older reports pruned.
+# One fixed filename, overwritten every run, rather than a fresh random one:
+# republishing the same path updates the same claude.ai artifact, so the
+# shareable link stays valid instead of changing on every capture. Old reports
+# were never linked anyway once a newer run finished.
+REPORT_FILENAME = "adcheck-report.html"
 
-    Only the newest report is ever linked, so previous ones are dead
-    weight -- clear them out rather than filling the repo dir over time.
-    """
+
+def current_report_path() -> Path:
+    """The report file under ./static -- same path every run."""
     STATIC_DIR.mkdir(exist_ok=True)
-    for stale in STATIC_DIR.glob("adcheck_report_*.html"):
+    for stale in STATIC_DIR.glob("adcheck_report_*.html"):  # pre-rename leftovers
         stale.unlink(missing_ok=True)
-    fd, path = tempfile.mkstemp(
-        suffix=".html", prefix="adcheck_report_", dir=str(STATIC_DIR)
-    )
-    os.close(fd)
-    return Path(path)
+    return STATIC_DIR / REPORT_FILENAME
 
 
 def _checklist_package(result: dict) -> str | None:
@@ -201,7 +201,7 @@ with st.container(border=True):
                         # read them off the installed APK instead.
                         verify_apk_rows(result, _checklist_package(result))
 
-                        report_path = new_report_path()
+                        report_path = current_report_path()
                         render_html(result, empty_filters, str(report_path))
                 except SystemExit as e:
                     # check_ads' pipeline functions signal user-facing errors
@@ -241,16 +241,41 @@ if not capturing and st.session_state.get("last_result"):
     if empty_filters:
         st.warning(f"These filters matched 0 log lines: {', '.join(empty_filters)}")
 
-    st.link_button(
-        "\U0001f5a5️ Mở report toàn màn hình",
-        f"{STATIC_URL_PREFIX}/{report_path.name}",
-        type="primary",
-        use_container_width=True,
-    )
-    st.caption(
-        "Link local (file trên máy này) -- không phải link claude.ai chia sẻ được. "
-        "Muốn có link chia sẻ, gửi lại report cho Claude ở 1 lượt chat."
-    )
+    local_url = f"{STATIC_URL_PREFIX}/{report_path.name}"
+    link = read_link()
+    if link:
+        # The artifact URL is the shareable one, so it leads. It is refreshed by
+        # Claude republishing this same report path -- the URL itself never
+        # changes, which is why it can be stored and reused across runs.
+        st.link_button(
+            "\U0001f310 Mở report toàn màn hình (link chia sẻ)",
+            link["url"],
+            type="primary",
+            use_container_width=True,
+        )
+        if is_stale(link, report_path):
+            st.warning(
+                "Link chia sẻ đang là bản publish trước, chưa có kết quả lần chạy này. "
+                f"Nhờ Claude publish lại `{report_path}` trong 1 lượt chat để cập nhật "
+                "(URL không đổi)."
+            )
+        else:
+            st.caption(f"Đã publish: {link['published_at']} -- URL giữ nguyên mỗi lần cập nhật.")
+        st.link_button(
+            "\U0001f5a5️ Mở bản local", local_url, use_container_width=True
+        )
+    else:
+        st.link_button(
+            "\U0001f5a5️ Mở report toàn màn hình",
+            local_url,
+            type="primary",
+            use_container_width=True,
+        )
+        st.caption(
+            "Link local (file trên máy này). Muốn nút này mở link chia sẻ được: nhờ Claude "
+            f"publish `{report_path}` thành artifact 1 lần, rồi lưu URL bằng "
+            "`python artifact_link.py <url>` -- từ đó nút tự mở artifact."
+        )
     st.code(str(report_path), language=None)
 
     with st.expander("Xem trước report", expanded=False):

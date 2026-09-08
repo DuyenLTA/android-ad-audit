@@ -42,6 +42,17 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   **once** per run in the report, not under individual rows -- that list is
   capture-wide, and pasting it under a row read as a per-row finding it never
   was.
+- The GUI cannot publish the report to a shareable claude.ai link by itself:
+  creating an artifact is a Claude Code action inside a chat turn, and a
+  headless `claude -p` run has no Artifact tool. What it does instead: the
+  report is always written to one fixed path (`static/adcheck-report.html`), so
+  publishing it once yields a URL that stays valid -- Claude republishing that
+  same path refreshes the artifact in place. Record the URL with
+  `python artifact_link.py <url>` and the "Mở report toàn màn hình" button
+  opens the shareable artifact from then on, warning when the artifact is older
+  than the run just finished. Note the report carries the Adjust token, the
+  Facebook app id/client token and every ad unit ID, so publishing sends that
+  to claude.ai (artifacts are private unless shared).
 
 ## Setup
 
