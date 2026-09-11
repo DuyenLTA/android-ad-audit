@@ -106,3 +106,32 @@ def test_another_app_is_never_mistaken_for_home():
     assert device.launches == 1, "phải mở lại app khi lạc sang app khác"
     assert result["reached_home"] is True
     assert result["visited"][-1] == "MainActivity"
+
+
+def test_every_pass_starts_from_an_empty_log_buffer(tmp_path, monkeypatch):
+    # Regression: `adb logcat` replays the whole ring buffer before following,
+    # so with a single clear up front the second pass re-appended everything the
+    # first had already written -- half the capture duplicated itself and no
+    # pass could be read on its own.
+    import device_driver
+
+    calls = []
+
+    class _Proc:
+        def terminate(self): pass
+        def wait(self, timeout=None): pass
+
+    monkeypatch.setattr(device_driver, "adb_run", lambda args, **k: calls.append(args) or "")
+    monkeypatch.setattr(device_driver.subprocess, "Popen", lambda *a, **k: _Proc())
+    monkeypatch.setattr(device_driver, "wipe_app_data", lambda *a, **k: None)
+    monkeypatch.setattr(device_driver, "force_stop", lambda *a, **k: None)
+    monkeypatch.setattr(device_driver, "launch", lambda *a, **k: None)
+    monkeypatch.setattr(device_driver, "splash_logo_spam", lambda *a, **k: 0)
+    monkeypatch.setattr(
+        device_driver, "drive_to_home",
+        lambda **k: {"reached_home": True, "visited": [], "actions": []},
+    )
+
+    device_driver.capture_session("com.x", str(tmp_path / "capture.log"))
+    clears = [c for c in calls if c == ["logcat", "-c"]]
+    assert len(clears) == len(device_driver.DEFAULT_PASSES)

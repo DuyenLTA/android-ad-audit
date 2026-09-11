@@ -103,6 +103,29 @@ nhiều app song song và lặp định kỳ.
   bên lệch nhau, nên `streamlit_app.FILTERS` giờ trỏ thẳng vào
   `check_ads.DEFAULT_FILTERS`, có test chặn.
 
+## Chạy lại fan-out sau khi đổi filter
+- 4 confirmed / 1 disputed -- **giống hệt lượt trước, bác đúng cùng một dòng**
+  (`inter_result_high`: nhãn đúng, chuỗi bằng chứng yếu). 5 verdict của judge
+  trùng khít. Lớp agent ổn định, không phải xúc xắc.
+- Filter mới có tác dụng thấy được: lượt này judge đọc thẳng `5307742543` từ
+  `leftover_ids` thay vì phải tự đào trong log, và `suggested_id` trả về ad unit
+  ID thật (`6620824217`, `5307742543`) thay vì slug bịa (`fo-306-onb-inter-high`).
+- Bằng chứng mới, mạnh hơn: `logPaidAdImpression` có
+  `"mediation_group_name":"AIP959_306_onb5_n_inter"` -- tên do AdMob console gán,
+  độc lập với cả APK lẫn sheet. Loại được giả thuyết "build wired sai, sheet đúng".
+
+## Bug capture: log bị dump lại (đã sửa)
+- Verifier phát hiện log capture tự lặp. Đo: **26.489/54.790 dòng trùng (48%)**,
+  9.055 dòng của pass "new" tái xuất trong pass "old".
+- Nguyên nhân: `capture_session` gọi `logcat -c` một lần trước vòng lặp, nhưng
+  mỗi pass spawn một `adb logcat` mới, mà logcat replay cả ring buffer trước khi
+  follow. Pass 2 chép lại nguyên pass 1.
+- Sửa: xoá buffer trước **mỗi** pass. Đo lại trên máy thật: **9.055 -> 0 dòng
+  tái xuất**. Phần trùng còn lại (33%) là logcat tự lặp trong cùng pass, không
+  phải dump lại. Có test chặn.
+- Hệ quả cũ: score không sai (extract theo set), nhưng log to gấp đôi, số dòng
+  trỏ vào hai chỗ cùng lúc, và không đọc riêng được từng luồng user.
+
 ## Việc còn lại
 - Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không
   phải của tool.

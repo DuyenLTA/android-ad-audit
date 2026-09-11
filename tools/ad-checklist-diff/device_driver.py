@@ -60,6 +60,11 @@ def capture_pass(
         # resumes wherever the previous pass left it.
         force_stop(package, run=run)
 
+    # `adb logcat` replays the whole ring buffer before it starts following, so
+    # a second pass would otherwise re-append everything the first pass already
+    # wrote: half the capture was a duplicate of itself, line numbers pointed at
+    # two places at once, and neither pass could be read on its own.
+    run(["logcat", "-c"])
     cmd = ["adb"] + (["-s", serial] if serial else []) + ["logcat"]
     proc = subprocess.Popen(cmd, stdout=log_file, stderr=subprocess.STDOUT)
     try:
@@ -84,8 +89,6 @@ def capture_session(
     tap_xy: tuple[int, int] | None = None,
 ) -> list[dict]:
     """Run the requested journeys into one capture file."""
-    run = _adb(serial)
-    run(["logcat", "-c"])
     results = []
     with open(out_path, "w", encoding="utf-8") as log_file:
         for name in passes:
