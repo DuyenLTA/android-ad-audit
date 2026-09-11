@@ -159,6 +159,29 @@ def app_id_from_xmltree(xmltree: str) -> str | None:
     return None
 
 
+def apk_contains(apk_path: str, needles: list[str]) -> dict[str, list[str]]:
+    """Which APK entries hold each literal string. Empty list means absent.
+
+    The agent layer kept re-implementing this by hand and kept getting it half
+    right: dex stores some strings UTF-16LE, so a UTF-8-only sweep reports a
+    placement as missing from a build that ships it. Both encodings are checked
+    here once, so "not in the build" means it.
+    """
+    wanted = [
+        (needle, needle.encode("utf-8"), needle.encode("utf-16-le"))
+        for needle in needles
+    ]
+    hits: dict[str, list[str]] = {needle: [] for needle in needles}
+    with zipfile.ZipFile(apk_path) as zf:
+        for info in zf.infolist():
+            with zf.open(info) as entry:
+                blob = entry.read()
+            for needle, utf8, utf16 in wanted:
+                if utf8 in blob or utf16 in blob:
+                    hits[needle].append(info.filename)
+    return hits
+
+
 def apk_ad_ids(apk_path: str) -> set[str]:
     """Every AdMob ID string compiled into the APK (dex, resources, assets)."""
     ids: set[str] = set()

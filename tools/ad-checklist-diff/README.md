@@ -207,9 +207,21 @@ cùng kết quả. `--force` để chạy lại bất chấp. Mỗi app sinh:
 - `out/<package>-triage.json` -- delta (dòng mới lệch / đã fix / ID lạ mới) và
   các dòng tool không tự kết luận được, chia theo loại
 
+Hỏi bản cài có chứa chuỗi nào không, không cần agent:
+
+```
+python apk_strings.py <package> show_inter_feature 4070123043
+```
+
+Quét cả UTF-8 lẫn UTF-16LE trong mọi entry, xong dưới một giây, in ra entry
+chứa chuỗi. Exit 1 nếu có chuỗi không tìm thấy. Dex lưu nhiều chuỗi UTF-16LE
+nên quét tay theo UTF-8 sẽ báo nhầm "không có trong build" cho placement thật
+sự có.
+
 Triage mang theo bối cảnh của chính lượt sinh ra nó: `version_code`,
 `audited_at`, `capture_log`, `empty_filters`, và `missed_home` -- các luồng chưa
-tới được Home. `missed_home: null` nghĩa là lượt đó không capture gì cả, khác
+tới được Home -- và `build_ad_ids`, toàn bộ ad unit ID quét được từ APK, để lớp
+agent tra thẳng thay vì mở APK quét lại. `missed_home: null` nghĩa là lượt đó không capture gì cả, khác
 hẳn `[]` là mọi luồng đều tới nơi. Không có mấy trường này thì ai đọc triage về
 sau -- người hay agent -- không có cách nào biết log mình đang tin là log của
 một lượt đi lạc.

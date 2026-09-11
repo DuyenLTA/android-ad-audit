@@ -14,12 +14,13 @@ an agent's attention.
 """
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from apk_source import base_apk, device_version_code
+from apk_source import apk_ad_ids, base_apk, cache_path, device_version_code
 from app_registry import DEFAULT_REGISTRY, load_apps, registry_sheet, sheet_url_for
 from audit_pipeline import run_audit
 from audit_snapshot import diff_results, load, save, triage
@@ -98,6 +99,16 @@ def audit_one(
     # next run would see no history at all.
     triage_rows = triage(result)
     triage_path = out_dir / f"{package}-triage.json"
+
+    # Câu hỏi agent hay hỏi nhất về APK là "ID này có trong build không". Quét
+    # một lần ở đây mất 0.4s; để agent tự quét thì nó viết lại đoạn zipfile ấy
+    # mỗi lượt, chậm hơn hàng trăm lần và thường quên mất dex lưu cả UTF-16LE.
+    cached_apk = cache_path(package, version_code) if version_code else None
+    build_ad_ids = (
+        sorted(apk_ad_ids(cached_apk))
+        if cached_apk and os.path.exists(cached_apk)
+        else None
+    )
     triage_path.write_text(
         json.dumps(
             {
@@ -110,6 +121,7 @@ def audit_one(
                 "audited_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "capture_log": capture_log,
                 "missed_home": missed_home,
+                "build_ad_ids": build_ad_ids,
                 "delta": delta,
                 "triage": triage_rows,
                 "empty_filters": empty_filters,

@@ -122,9 +122,17 @@ Với MỖI dòng trong triage (chỉ những dòng này, không xét dòng đã
 - khong-ket-luan-duoc: không đủ bằng chứng
 
 Cách kiểm chứng, dùng đúng các nguồn này, KHÔNG đoán:
-- APK đang cache: ~/.cache/ad-checklist-diff/${pkg}-*.apk
-  (tìm chuỗi bằng python zipfile, quét entry .dex/.arsc)
-- Nếu tên placement không xuất hiện trong dex thì đó là build-thieu, không phải sai ID
+- "ID này có trong bản cài không": tra thẳng mảng build_ad_ids trong triage --
+  đó là toàn bộ ad unit ID tool đã quét được từ APK. ĐỪNG tự mở APK ra quét lại.
+  build_ad_ids là null thì mới cần tự kiểm.
+- Chuỗi khác (tên placement, tên cờ), chạy đúng một lệnh, đừng tự viết zipfile:
+
+    cd ${repoDir} && .venv/bin/python ${toolDir}/apk_strings.py ${pkg} <chuỗi> <chuỗi>
+
+  Nó quét cả UTF-8 lẫn UTF-16LE trong mọi entry, xong trong dưới một giây, và in
+  ra entry chứa chuỗi đó. Tự viết vòng quét tay vừa chậm vừa hay sót UTF-16LE --
+  sót là báo nhầm "không có trong build" cho placement thật sự có.
+- Nếu tên placement không xuất hiện trong APK thì đó là build-thieu, không phải sai ID
 - Log của lượt capture gần nhất: ${toolDir}/out/${pkg}-capture.log -- tìm cặp
   key=<high_id>_<normal_id>: nửa kia của cặp đã khớp checklist thì nửa còn lại
   chính là ID build đang dùng cho dòng twin
