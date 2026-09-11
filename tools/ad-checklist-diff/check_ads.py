@@ -9,6 +9,7 @@ The log file must already be captured (e.g. `adb logcat > file.log` while
 manually triggering the app) -- this script never touches a device.
 """
 import argparse
+import json
 import os
 import sys
 
@@ -195,40 +196,72 @@ def print_summary(result: dict, empty_filters: list[str]) -> None:
             print(f"  - {v}")
 
 
-def main() -> None:
+DEFAULT_FILTERS = [
+    "FOR_TESTER",
+    "VslTemplate4FirstOpenSDK",
+    "UserMessagingPlatform",
+    "AdsConsentManager",
+    "RemoteConfigRepository",
+    "inter_ads",
+]
+
+EXIT_OK = 0
+EXIT_MISMATCH = 2
+
+
+def main() -> int:
+    # Imported here, not at module scope: audit_pipeline imports this module
+    # for the diff primitives, so a top-level import would be circular.
+    from audit_pipeline import run_audit
+
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sheet", required=True, help="Google Sheet checklist URL")
-    parser.add_argument("--log", required=True, help="Path to a captured logcat text file")
+    parser.add_argument("--sheet", required=True, help="Google Sheet checklist URL (kèm gid của tab)")
+    parser.add_argument("--log", help="Logcat đã capture. Bỏ qua nếu chỉ verify từ APK")
     parser.add_argument(
         "--filter",
         action="append",
-        required=True,
         dest="filters",
-        help="Substring to select trusted log lines (repeatable)",
+        help=f"Chuỗi con chọn dòng log tin cậy (lặp lại được). Mặc định: {', '.join(DEFAULT_FILTERS)}",
     )
-    parser.add_argument("--out", default="report.html", help="Output HTML report path")
+    parser.add_argument("--apk", help="Verify từ file APK này -- không gọi adb, chạy được song song")
+    parser.add_argument("--package", help="Package để pull APK từ máy (cache theo versionCode)")
+    parser.add_argument("--out", help="Xuất report HTML")
+    parser.add_argument("--json", dest="json_out", help="Xuất kết quả dạng JSON cho agent/script")
     args = parser.parse_args()
 
-    if not os.path.isfile(args.log):
+    if not args.log and not (args.apk or args.package):
+        raise SystemExit("Cần ít nhất --log, hoặc --apk/--package để verify từ APK")
+    if args.log and not os.path.isfile(args.log):
         raise SystemExit(f"--log file not found: {args.log}")
+    if args.apk and not os.path.isfile(args.apk):
+        raise SystemExit(f"--apk file not found: {args.apk}")
 
-    checklist = fetch_checklist(args.sheet)
-    trusted_by_filter = load_trusted_lines(args.log, args.filters)
-    empty_filters = [f for f, lines in trusted_by_filter.items() if not lines]
-    all_trusted_lines = [line for lines in trusted_by_filter.values() for line in lines]
-    trusted_values = extract_values(all_trusted_lines)
-    label_value_pairs = extract_label_value_pairs(all_trusted_lines)
-    key_value_pairs = extract_key_value_pairs(all_trusted_lines)
-    key_cooccurrences = extract_key_cooccurrences(all_trusted_lines)
-    result = diff(checklist, trusted_values, label_value_pairs, key_value_pairs, key_cooccurrences)
+    # --apk means "here is the build" -- no device is consulted at all, which
+    # is what makes a fan-out across many apps possible without a phone.
+    result, empty_filters = run_audit(
+        args.sheet,
+        args.filters or DEFAULT_FILTERS,
+        log_path=args.log,
+        package=args.package,
+        apk_path=args.apk,
+        use_device=not args.apk,
+    )
 
     print_summary(result, empty_filters)
-    render_html(result, empty_filters, args.out)
-    print(f"\nReport written to {args.out}")
+    if args.out:
+        render_html(result, empty_filters, args.out)
+        print(f"\nReport written to {args.out}")
+    if args.json_out:
+        with open(args.json_out, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        print(f"JSON written to {args.json_out}")
+
+    missing = sum(1 for rows in result["sections"].values() for r in rows if not r["found"])
+    return EXIT_MISMATCH if missing else EXIT_OK
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

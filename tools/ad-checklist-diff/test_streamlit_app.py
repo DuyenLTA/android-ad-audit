@@ -51,9 +51,12 @@ def test_start_stop_lifecycle_with_real_device():
     at.button(key="stop_btn").click().run(timeout=20)  # includes a real network fetch of the sheet
     assert at.session_state["capture_proc"] is None
     assert not at.exception
-    # Report must be linked over the app's own http origin -- a file://
+    # Report must be reachable over the app's own http origin -- a file://
     # URL is blocked by the browser when navigated to from an http page.
-    assert at.get("link_button")[0].url.startswith("/app/static/")
+    # Whether the artifact link leads depends on whether one was recorded, so
+    # assert the local link exists rather than which button comes first.
+    urls = [b.url for b in at.get("link_button")]
+    assert any(u.startswith("/app/static/") for u in urls), urls
 
 
 def test_stop_with_invalid_sheet_url_shows_clean_error(tmp_path):

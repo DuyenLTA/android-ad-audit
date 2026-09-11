@@ -22,8 +22,9 @@ from pathlib import Path
 LINK_FILE = Path(__file__).parent / "artifact-link.json"
 
 
-def read_link(link_file: Path = LINK_FILE) -> dict | None:
+def read_link(link_file: Path | None = None) -> dict | None:
     """The recorded artifact URL, or None if the report was never published."""
+    link_file = link_file or LINK_FILE
     try:
         data = json.loads(link_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -31,8 +32,9 @@ def read_link(link_file: Path = LINK_FILE) -> dict | None:
     return data if data.get("url") else None
 
 
-def write_link(url: str, link_file: Path = LINK_FILE) -> dict:
+def write_link(url: str, link_file: Path | None = None) -> dict:
     """Record the artifact URL the report path is published to."""
+    link_file = link_file or LINK_FILE
     data = {"url": url, "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
     link_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return data

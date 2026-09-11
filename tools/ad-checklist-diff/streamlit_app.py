@@ -15,19 +15,9 @@ from pathlib import Path
 
 import streamlit as st
 
-from check_ads import (
-    diff,
-    extract_key_cooccurrences,
-    extract_key_value_pairs,
-    extract_label_value_pairs,
-    extract_values,
-    fetch_checklist,
-    load_trusted_lines,
-    render_html,
-)
-from apk_verifier import verify_apk_rows
+from check_ads import render_html
 from artifact_link import is_stale, read_link
-from package_verifier import is_package_name, verify_package_rows
+from audit_pipeline import run_audit
 
 # Locked to this org's standard logcat filters -- not user-editable.
 # UserMessagingPlatform/AdsConsentManager catch the AdMob App ID's own log
@@ -125,15 +115,6 @@ def current_report_path() -> Path:
     return STATIC_DIR / REPORT_FILENAME
 
 
-def _checklist_package(result: dict) -> str | None:
-    """The package name the checklist declares -- the APK to read the App ID from."""
-    for rows in result["sections"].values():
-        for row in rows:
-            if is_package_name(row["value"]):
-                return row["value"]
-    return None
-
-
 capturing = st.session_state.capture_proc is not None
 
 with st.container(border=True):
@@ -184,22 +165,11 @@ with st.container(border=True):
             else:
                 try:
                     with st.spinner("Diffing against the checklist..."):
-                        checklist = fetch_checklist(run_sheet_url)
-                        trusted_by_filter = load_trusted_lines(str(log_path), run_filters)
-                        empty_filters = [f for f, lines in trusted_by_filter.items() if not lines]
-                        all_lines = [line for lines in trusted_by_filter.values() for line in lines]
-                        trusted_values = extract_values(all_lines)
-                        label_value_pairs = extract_label_value_pairs(all_lines)
-                        key_value_pairs = extract_key_value_pairs(all_lines)
-                        key_cooccurrences = extract_key_cooccurrences(all_lines)
-                        result = diff(
-                            checklist, trusted_values, label_value_pairs, key_value_pairs, key_cooccurrences
+                        # Same composition the CLI runs, so a headless audit
+                        # and this one reach the same verdict.
+                        result, empty_filters = run_audit(
+                            run_sheet_url, run_filters, log_path=str(log_path)
                         )
-                        verify_package_rows(result)
-                        # App ID and the ad unit IDs of placements this
-                        # capture never exercised have no log line to grep --
-                        # read them off the installed APK instead.
-                        verify_apk_rows(result, _checklist_package(result))
 
                         report_path = current_report_path()
                         render_html(result, empty_filters, str(report_path))
