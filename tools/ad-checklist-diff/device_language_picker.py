@@ -14,6 +14,14 @@ So: unfold English, then take the first variant inside it. Matching the variant
 by name would be a second thing to keep in step with the build ("English (US)"
 vs "English (United States)"); position inside the group needs no such list.
 
+The group can also arrive already unfolded: the flow crosses two language
+activities, and the second one inherits the first one's open group. Tapping the
+expander there *folds* it, and "first checkbox below the English row" then means
+the next language down -- हिन्दी (India) -- selected while the label still
+claimed English. So the open state is read off the rows themselves before
+touching the expander: a variant sits indented relative to its parent row, which
+holds whatever the variants are called.
+
 Rows are matched by vertical overlap rather than tree structure -- a row's title
 and its control share a y-range, which survives the flat node list that
 `uiautomator dump` produces.
@@ -44,12 +52,35 @@ def _nodes_with_id(xml: str, suffix: str):
             yield node, b
 
 
+def row_box(xml: str, title: str) -> tuple[int, int, int] | None:
+    """Left edge and vertical extent of the row titled exactly `title`."""
+    for node, (x1, y1, _x2, y2) in _nodes_with_id(xml, TITLE_ID):
+        if _attr(node, "text") == title:
+            return x1, y1, y2
+    return None
+
+
 def row_span(xml: str, title: str) -> tuple[int, int] | None:
     """Vertical extent of the row titled exactly `title`."""
-    for node, (_x1, y1, _x2, y2) in _nodes_with_id(xml, TITLE_ID):
-        if _attr(node, "text") == title:
-            return y1, y2
-    return None
+    box = row_box(xml, title)
+    return (box[1], box[2]) if box else None
+
+
+def variants_unfolded(xml: str, x_left: int, y_bottom: int) -> bool:
+    """Whether the row below the one at `y_bottom` is one of its variants.
+
+    Variants are indented under their parent; the next row at the parent's own
+    left edge is the next language, not a variant.
+    """
+    below = [
+        (y1, x1)
+        for _node, (x1, y1, _x2, _y2) in _nodes_with_id(xml, TITLE_ID)
+        if y1 >= y_bottom
+    ]
+    if not below:
+        return False
+    _y, x1 = min(below)
+    return x1 > x_left
 
 
 def control_between(xml: str, control_id: str, y_top: int, y_bottom: int | None = None):
@@ -72,27 +103,30 @@ def pick(language: str, xml_fn, run, sleep=None) -> str | None:
     one would also fire on the happy path and move the selection off English.
     """
     xml = xml_fn()
-    span = row_span(xml, language)
+    box = row_box(xml, language)
 
-    if span:
-        y_top, y_bottom = span
+    if box:
+        x_left, y_top, y_bottom = box
         # Some builds make the language selectable without unfolding at all.
         centre = control_between(xml, CHECKBOX_ID, y_top, y_bottom)
         if centre:
             tap(*centre, run=run)
             return language
 
+        already_open = variants_unfolded(xml, x_left, y_bottom)
         expander = control_between(xml, EXPAND_ID, y_top, y_bottom)
-        if expander:
+        if expander and not already_open:
             tap(*expander, run=run)
             if sleep:
                 sleep(1)
+            xml = xml_fn()
+            box = row_box(xml, language) or box
+            y_bottom = box[2]
+        if expander or already_open:
             # The variants unfold directly beneath their own row, so the first
             # checkbox below it is the first variant of this language and not
             # some unrelated row further down.
-            xml = xml_fn()
-            span = row_span(xml, language) or span
-            variant = control_between(xml, CHECKBOX_ID, span[1])
+            variant = control_between(xml, CHECKBOX_ID, y_bottom)
             if variant:
                 tap(*variant, run=run)
                 return f"{language} (biến thể đầu)"

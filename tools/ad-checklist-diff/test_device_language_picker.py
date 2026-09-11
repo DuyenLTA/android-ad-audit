@@ -90,3 +90,26 @@ def test_recycled_zero_area_rows_are_ignored():
     screen = _Screen(first=xml, then=xml)
     assert pick("English", screen.xml, screen.run, sleep=lambda s: None) is None
     assert screen.taps == []
+
+
+def test_does_not_refold_a_group_that_arrived_open():
+    # The second language activity inherits the first one's open group. Tapping
+    # the expander there folds it, and the "first variant" then resolves to the
+    # next language down -- which is how a capture ran in हिन्दी while the label
+    # said English.
+    screen = _Screen(first=EXPANDED, then=COLLAPSED)
+    label = pick("English", screen.xml, screen.run, sleep=lambda s: None)
+    assert screen.taps == [(1011, 802)]  # straight to English (US), no expander
+    assert "English" in label
+
+
+def test_takes_the_first_variant_when_open_without_an_expander_node():
+    open_no_expander = (
+        '<node resource-id="x:id/titleLanguageItem" text="English" bounds="[202,563][982,658]" />'
+        '<node resource-id="x:id/titleLanguageItem" text="English (US)" bounds="[274,754][982,849]" />'
+        '<node resource-id="x:id/checkboxLanguageItem" text="" bounds="[982,773][1040,831]" />'
+    )
+    screen = _Screen(first=open_no_expander, then=open_no_expander)
+    label = pick("English", screen.xml, screen.run, sleep=lambda s: None)
+    assert screen.taps == [(1011, 802)]
+    assert "English" in label
