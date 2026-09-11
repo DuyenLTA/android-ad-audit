@@ -27,8 +27,9 @@ nhiều app song song và lặp định kỳ.
 |---|-------|-----------|
 | 01 | [Headless audit engine](phase-01-headless-audit-engine.md) — CLI `--json/--apk/--package`, log optional, exit code, registry | **Xong** |
 | 02 | [Device driver automation](phase-02-device-driver-automation.md) — tự mở app, spam logo, qua onboarding, 2 luồng user | **Xong** |
-| 03 | Agent fan-out (`workflows/audit-fanout.mjs`): 1 agent/app phán dòng ambiguous, có lượt phản biện | **Xong** (chưa chạy thật) |
+| 03 | Agent fan-out (`workflows/audit-fanout.mjs`): 1 agent/app phán dòng ambiguous, có lượt phản biện | **Xong** |
 | 04 | Lặp định kỳ: `audit_runner.py` bỏ qua build chưa đổi, diff snapshot, xuất delta + triage | **Xong** |
+| 05 | Lane device trong runner (`--capture`) + cron hàng ngày (`scheduled-audit.sh`) | **Xong** |
 
 ## Dependencies
 - 01 chặn tất cả: chưa có JSON + CLI device-free thì agent phải parse HTML.
@@ -57,3 +58,43 @@ nhiều app song song và lặp định kỳ.
   → mất lịch sử. Đã đổi thành `<package>-triage.json`, có test chặn.
 - Còn lại: cron thực tế (chạy `audit_runner.py` theo lịch) và chạy thử workflow
   agent — cả hai chưa bật.
+
+## Kết quả Phase 05 (đo thật)
+- Lane device đã nằm trong runner: `audit_runner.py --capture` tự lái máy cho
+  từng app rồi audit trên đúng log vừa ghi, tuần tự một app một lượt. Trước đó
+  runner chỉ có lane APK; phần capture vẫn phải chạy tay.
+- Chạy thật 1 lệnh, không ai đụng máy: **71/76**, đúng bằng bản chạy tay ở
+  Phase 02. So với baseline APK-only: 7 dòng "fix" (đúng các dòng chỉ log mới
+  trả lời được), 0 dòng mới lệch, 2 ID lạ mới.
+- Triage sau lượt capture: 5 dòng "không có trong build", **0 dòng "chưa thấy
+  trong log"** -- đúng như kỳ vọng, 7 dòng "chưa thấy" của lượt APK-only trước
+  đó là giả, do lượt đó không capture.
+- Cron đã bật: `0 9 * * *` gọi `scheduled-audit.sh` (APK-only). Wrapper chỉ in
+  ra stdout khi có dòng mới lệch hoặc lỗi, nên cron chỉ gửi mail khi có chuyện;
+  không có máy cắm thì bỏ lượt, exit 0. Đã test cả hai nhánh.
+- Sửa kèm: `run_all` không truyền `snapshots_dir` nên test ghi thẳng vào
+  `snapshots/` thật (`com.a.json`, `com.b.json` lẫn với baseline). Đã thông
+  tham số và thêm test chặn.
+
+## Kết quả chạy thật agent fan-out
+- 6 agent (1 judge + 5 phản biện), 0 lỗi, ~12 phút, 656k token.
+- **4/5 finding được giữ, 1 bị bác.** Dòng bị bác (`inter_result_high`): nhãn
+  cuối đúng nhưng 2/3 bằng chứng sai -- judge nói "không có biến thể result nào
+  trong build", thực tế build có `show_result_img_vid(_high)`. Lượt phản biện
+  làm đúng việc của nó.
+- Kết luận được giữ: cặp `306_onb4_n_inter*` là **checklist ghi sai ID** (build
+  dùng `6620824217`/`5307742543`, và placement tên `onb5` chứ không phải
+  `onb4`); `inter_feature_high` cũng checklist sai (build dùng `1744932982`);
+  `inter_result` là **build thiếu placement** thật.
+- 2 "ID lạ mới" mà pass deterministic bắt được chính là ID build đang dùng --
+  hai lớp độc lập chỉ vào cùng một chỗ.
+
+## Việc còn lại
+- **Khoảng hở filter (cần người quyết).** Dòng
+  `D TAG : loadInterstitialAd: <high> - <normal>` không khớp filter nào trong 6
+  filter mặc định, nên `5307742543` không vào `trusted_values` và không hiện ở
+  `leftover_ids`. Không phải lỗi `extract_values` (nó đã `finditer` mọi ID trên
+  dòng). Thêm filter = nới định nghĩa "dòng tin cậy" -- repo từng revert đúng
+  loại thay đổi này, nên không tự sửa.
+- Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không
+  phải của tool.

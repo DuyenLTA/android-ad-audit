@@ -23,6 +23,8 @@ from app_registry import load_apps, sheet_url_for
 from audit_pipeline import run_audit
 from audit_snapshot import diff_results, load, save, triage
 from check_ads import DEFAULT_FILTERS
+from device_driver import capture_session
+from device_flow import DEFAULT_HOME_MATCH
 
 DEFAULT_OUT_DIR = Path(__file__).parent / "out"
 
@@ -97,6 +99,64 @@ def audit_one(
     }
 
 
+def capture_and_audit(
+    app: dict,
+    base_sheet: str,
+    *,
+    out_dir: Path,
+    force: bool = False,
+    serial: str | None = None,
+    timeout: int = 300,
+    snapshots_dir=None,
+) -> dict:
+    """Device lane for one app: drive the phone, then audit against that capture.
+
+    The APK alone cannot answer every row -- the "Thông số kỹ thuật" section only
+    shows up in a log -- so this is the fuller audit, at the cost of needing the
+    one phone to itself.
+    """
+    package = app["package"]
+    label = app.get("label") or package
+
+    # The skip has to happen *before* the capture, otherwise the phone spends
+    # minutes producing a log that `audit_one` would then decline to look at.
+    snap_kwargs = {"directory": snapshots_dir} if snapshots_dir else {}
+    version_code = device_version_code(package)
+    previous = load(package, **snap_kwargs)
+    if (
+        not force
+        and previous
+        and version_code
+        and previous.get("version_code") == version_code
+    ):
+        return {"package": package, "label": label, "skipped": "build chưa đổi", "version_code": version_code}
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    log_path = out_dir / f"{package}-capture.log"
+    splash_tap = app.get("splash_tap")
+    passes = capture_session(
+        package,
+        str(log_path),
+        serial=serial,
+        timeout=timeout,
+        home_match=app.get("home_match") or DEFAULT_HOME_MATCH,
+        tap_xy=tuple(splash_tap) if splash_tap else None,
+    )
+
+    # Already decided to run above; `force` here only stops the second skip check.
+    summary = audit_one(
+        app,
+        base_sheet,
+        out_dir=out_dir,
+        force=True,
+        capture_log=str(log_path),
+        snapshots_dir=snapshots_dir,
+    )
+    summary["capture_log"] = str(log_path)
+    summary["missed_home"] = [p["pass"] for p in passes if not p["reached_home"]]
+    return summary
+
+
 def run_all(
     apps: list[dict],
     base_sheet: str,
@@ -104,13 +164,34 @@ def run_all(
     out_dir: Path = DEFAULT_OUT_DIR,
     force: bool = False,
     workers: int = 4,
+    capture: bool = False,
+    serial: str | None = None,
+    timeout: int = 300,
+    snapshots_dir=None,
 ) -> list[dict]:
-    """Audit every app. APK-only work is parallel -- no device is involved."""
+    """Audit every app. APK-only work is parallel -- no device is involved.
+
+    A capture drives the one phone, so that lane runs one app after another no
+    matter what `workers` says.
+    """
     def work(app):
         try:
-            return audit_one(app, base_sheet, out_dir=out_dir, force=force)
+            if capture:
+                return capture_and_audit(
+                    app,
+                    base_sheet,
+                    out_dir=out_dir,
+                    force=force,
+                    serial=serial,
+                    timeout=timeout,
+                    snapshots_dir=snapshots_dir,
+                )
+            return audit_one(app, base_sheet, out_dir=out_dir, force=force, snapshots_dir=snapshots_dir)
         except SystemExit as e:  # pipeline signals user-facing errors this way
             return {"package": app["package"], "error": str(e)}
+
+    if capture:
+        return [work(app) for app in apps]
 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(apps) or 1))) as pool:
         return list(pool.map(work, apps))
@@ -134,6 +215,10 @@ def print_summary(results: list[dict]) -> None:
                 flags.append(f"{len(delta['new_leftover_ids'])} ID lạ mới")
             state = ", ".join(flags) if flags else "không đổi"
             print(f"  [{r['score']}] {name}: {state}")
+            if r.get("missed_home"):
+                # A journey that never reached Home captured less than it should
+                # have, so its "chưa thấy trong log" rows are not evidence of a bug.
+                print(f"         luồng chưa tới Home: {', '.join(r['missed_home'])}")
 
 
 def main() -> int:
@@ -143,11 +228,25 @@ def main() -> int:
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--force", action="store_true", help="Chạy cả khi versionCode chưa đổi")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument(
+        "--capture",
+        action="store_true",
+        help="Tự lái máy capture log cho từng app (tuần tự, cần device); mặc định chỉ đọc APK",
+    )
+    parser.add_argument("--serial", help="adb serial, khi cắm nhiều máy")
+    parser.add_argument("--timeout", type=int, default=300, help="Giới hạn mỗi luồng khi capture, giây")
     args = parser.parse_args()
 
     apps = load_apps(args.registry) if args.registry else load_apps()
     results = run_all(
-        apps, args.sheet, out_dir=Path(args.out), force=args.force, workers=args.workers
+        apps,
+        args.sheet,
+        out_dir=Path(args.out),
+        force=args.force,
+        workers=args.workers,
+        capture=args.capture,
+        serial=args.serial,
+        timeout=args.timeout,
     )
     print_summary(results)
 

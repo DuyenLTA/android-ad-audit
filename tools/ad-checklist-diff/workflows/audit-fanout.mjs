@@ -63,8 +63,9 @@ Cách kiểm chứng, dùng đúng các nguồn này, KHÔNG đoán:
 - APK đang cache: ${toolDir}/../../../.cache/ad-checklist-diff/${pkg}-*.apk
   (tìm chuỗi bằng python zipfile, quét entry .dex/.arsc)
 - Nếu tên placement không xuất hiện trong dex thì đó là build-thieu, không phải sai ID
-- Log gần nhất nếu có, để tìm cặp key=<high_id>_<normal_id>: nửa kia của cặp đã khớp
-  checklist thì nửa còn lại chính là ID build đang dùng cho dòng twin
+- Log của lượt capture gần nhất: ${toolDir}/out/${pkg}-capture.log -- tìm cặp
+  key=<high_id>_<normal_id>: nửa kia của cặp đã khớp checklist thì nửa còn lại
+  chính là ID build đang dùng cho dòng twin
 Mỗi finding phải kèm evidence trích dẫn được (tên file + chuỗi tìm thấy/không thấy).`,
   { label: `judge:${pkg}`, phase: 'Judge', schema: FINDINGS_SCHEMA },
 )

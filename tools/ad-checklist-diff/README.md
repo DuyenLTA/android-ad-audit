@@ -197,7 +197,41 @@ cùng kết quả. `--force` để chạy lại bất chấp. Mỗi app sinh:
   các dòng tool không tự kết luận được, chia theo loại
 
 Phần audit từ APK không đụng device nên chạy song song giữa các app; phần
-capture cần máy thì phải tuần tự vì chỉ có một máy.
+capture cần máy thì phải tuần tự vì chỉ có một máy:
+
+```
+python audit_runner.py --sheet <url sheet gốc> --capture
+```
+
+`--capture` tự lái máy cho từng app (cả hai luồng user) rồi audit trên đúng log
+vừa ghi, một app một lượt. Log để ở `out/<package>-capture.log`. Luồng nào
+không tới được Home thì bản tóm tắt nói rõ -- các dòng "chưa thấy trong log"
+của lượt đó không đáng tin.
+
+Lưu ý: kể cả lượt APK-only vẫn cần máy cắm, vì `versionCode` đọc từ `dumpsys`
+và base APK phải pull về. "Device-free" ở đây nghĩa là không lái UI, không phải
+không cần máy.
+
+### 3b. Chạy theo lịch
+
+```
+AD_AUDIT_SHEET=<url sheet gốc> ./scheduled-audit.sh
+```
+
+Wrapper cho cron: ghi mọi lượt vào `out/scheduled-audit.log`, nhưng **chỉ in ra
+stdout khi có dòng mới lệch hoặc lỗi** -- cron gửi mail theo stdout, nên lượt
+không có gì đổi thì im lặng. Không có máy cắm thì bỏ lượt và exit 0 thay vì báo
+lỗi. Log tự cắt ở 5000 dòng.
+
+Dòng crontab hàng ngày 9h:
+
+```
+AD_AUDIT_SHEET=https://docs.google.com/spreadsheets/d/<id>/edit
+0 9 * * * /path/to/tools/ad-checklist-diff/scheduled-audit.sh
+```
+
+Env đổi được: `AD_AUDIT_PYTHON`, `AD_AUDIT_LOG`, `AD_AUDIT_LOG_LINES`,
+`AD_AUDIT_ADB_PATH`.
 
 ### 4. Lớp agent (tuỳ chọn)
 

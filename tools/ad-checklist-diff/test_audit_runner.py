@@ -1,7 +1,7 @@
 import json
 
 import audit_runner
-from audit_runner import audit_one, run_all
+from audit_runner import audit_one, capture_and_audit, run_all
 
 APPS = [{"package": "com.a", "gid": "1", "label": "A"}, {"package": "com.b", "gid": "2"}]
 SHEET = "https://docs.google.com/spreadsheets/d/ABC/edit"
@@ -66,6 +66,79 @@ def test_missing_apk_is_reported_per_app_not_fatal(tmp_path, monkeypatch):
 
 def test_run_all_covers_every_app(tmp_path, monkeypatch):
     _stub(monkeypatch)
-    monkeypatch.setattr(audit_runner, "DEFAULT_DIR", tmp_path, raising=False)
-    results = run_all(APPS, SHEET, out_dir=tmp_path, force=True, workers=2)
+    results = run_all(APPS, SHEET, out_dir=tmp_path, force=True, workers=2, snapshots_dir=tmp_path)
     assert {r["package"] for r in results} == {"com.a", "com.b"}
+
+
+def _stub_capture(monkeypatch, *, reached=("new", "old"), missed=()):
+    captured = []
+
+    def fake_capture(package, out_path, **kwargs):
+        captured.append((package, out_path, kwargs))
+        open(out_path, "w", encoding="utf-8").write("log\n")
+        return [
+            {"pass": name, "reached_home": name not in missed}
+            for name in (*reached, *missed)
+        ]
+
+    monkeypatch.setattr(audit_runner, "capture_session", fake_capture)
+    return captured
+
+
+def test_capture_lane_audits_against_the_log_it_just_recorded(tmp_path, monkeypatch):
+    _stub(monkeypatch)
+    captured = _stub_capture(monkeypatch)
+    seen = {}
+    monkeypatch.setattr(
+        audit_runner,
+        "run_audit",
+        lambda *a, **k: (seen.update(k), (RESULT, []))[1],
+    )
+    out = capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert len(captured) == 1
+    assert out["capture_log"] == seen["log_path"] == str(tmp_path / "com.a-capture.log")
+
+
+def test_unchanged_build_skips_before_touching_the_phone(tmp_path, monkeypatch):
+    # A capture costs minutes of the one phone's time; deciding to skip only
+    # afterwards would spend all of it for an answer already on disk.
+    _stub(monkeypatch)
+    captured = _stub_capture(monkeypatch)
+    capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    again = capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert "skipped" in again
+    assert len(captured) == 1
+
+
+def test_journey_that_never_reached_home_is_flagged(tmp_path, monkeypatch):
+    # Rows "chưa thấy trong log" mean nothing if the capture stopped early.
+    _stub(monkeypatch)
+    _stub_capture(monkeypatch, reached=("new",), missed=("old",))
+    out = capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert out["missed_home"] == ["old"]
+
+
+def test_capture_lane_runs_one_app_at_a_time(tmp_path, monkeypatch):
+    # One phone: two captures overlapping would interleave two apps' logs.
+    _stub(monkeypatch)
+    live = []
+    overlapped = []
+
+    def fake_capture(package, out_path, **kwargs):
+        overlapped.append(list(live))
+        live.append(package)
+        open(out_path, "w", encoding="utf-8").write("log\n")
+        live.remove(package)
+        return [{"pass": "new", "reached_home": True}]
+
+    monkeypatch.setattr(audit_runner, "capture_session", fake_capture)
+    run_all(APPS, SHEET, out_dir=tmp_path, force=True, capture=True, snapshots_dir=tmp_path)
+    assert overlapped == [[], []]
+
+
+def test_run_all_writes_snapshots_where_told(tmp_path, monkeypatch):
+    # Without this the default snapshot directory is the live one, so a test run
+    # would overwrite real baselines.
+    _stub(monkeypatch)
+    run_all(APPS, SHEET, out_dir=tmp_path, force=True, snapshots_dir=tmp_path)
+    assert {p.name for p in tmp_path.glob("com.*.json")} >= {"com.a.json", "com.b.json"}
