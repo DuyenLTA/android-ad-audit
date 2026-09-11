@@ -153,3 +153,55 @@ the Nexus checklist's "Home -> inter_feature_high" row is logged in code as
 `enable_401_home_a_inter_high` (same placement/flag, different internal
 name) -- add that string as column C on that row and it matches correctly
 even though the two names share no substring.
+
+## Chạy nhiều app, chạy định kỳ
+
+### 1. Capture tự động (1 device, 2 luồng user)
+
+```
+python device_driver.py --package <pkg> --out session.log
+```
+
+Tự mở app, spam logo splash (bắt buộc -- không tap thì `FOR_TESTER` ra 0 dòng),
+đi qua onboarding tới Home, chạy **cả hai luồng vào chung một log**: new user
+(`pm clear`, ra placement FO) rồi old user (cold start, ra placement
+resume/in-app). `--pass new` / `--pass old` để chạy riêng một luồng.
+
+Điều hướng bám theo tên activity đang focus, không bám pixel. Nút đóng ads nhận
+theo nhãn đa ngôn ngữ và **thử lại** tới khi màn đổi, vì nút chỉ hiện sau
+countdown. Nếu tap lỡ mở sang app khác, driver phát hiện sai package và mở lại
+app thay vì tưởng đã tới Home.
+
+### 2. Audit một app
+
+```
+python check_ads.py --sheet <url+gid> --log session.log --package <pkg> --json out.json
+python check_ads.py --sheet <url+gid> --apk build.apk        # không cần device
+```
+
+`--json` cho script/agent đọc; exit code 2 khi còn dòng Lệch.
+
+### 3. Audit toàn bộ registry
+
+`apps.json` (xem `apps.example.json`) map mỗi app tới tab sheet của nó:
+
+```
+python audit_runner.py --sheet <url sheet gốc>
+```
+
+App nào `versionCode` chưa đổi so với lần trước thì **bỏ qua** -- cùng build thì
+cùng kết quả. `--force` để chạy lại bất chấp. Mỗi app sinh:
+
+- `snapshots/<package>.json` -- baseline cho lần sau
+- `out/<package>-triage.json` -- delta (dòng mới lệch / đã fix / ID lạ mới) và
+  các dòng tool không tự kết luận được, chia theo loại
+
+Phần audit từ APK không đụng device nên chạy song song giữa các app; phần
+capture cần máy thì phải tuần tự vì chỉ có một máy.
+
+### 4. Lớp agent (tuỳ chọn)
+
+`workflows/audit-fanout.mjs` -- một agent mỗi app, chỉ đọc các dòng trong
+triage, kết luận (checklist sai / build thiếu / chưa capture đủ) rồi một lượt
+phản biện từng kết luận. Phần diff vẫn là Python: agent không làm lại việc mà
+`grep` đã làm đúng.

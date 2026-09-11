@@ -27,8 +27,8 @@ nhiều app song song và lặp định kỳ.
 |---|-------|-----------|
 | 01 | [Headless audit engine](phase-01-headless-audit-engine.md) — CLI `--json/--apk/--package`, log optional, exit code, registry | **Xong** |
 | 02 | [Device driver automation](phase-02-device-driver-automation.md) — tự mở app, spam logo, qua onboarding, 2 luồng user | **Xong** |
-| 03 | Agent fan-out (Workflow): 1 agent/app phán dòng ambiguous + viết report | Sau 01+02 |
-| 04 | Lặp định kỳ: cron theo versionCode, diff 2 snapshot JSON, chỉ báo delta | Sau 03 |
+| 03 | Agent fan-out (`workflows/audit-fanout.mjs`): 1 agent/app phán dòng ambiguous, có lượt phản biện | **Xong** (chưa chạy thật) |
+| 04 | Lặp định kỳ: `audit_runner.py` bỏ qua build chưa đổi, diff snapshot, xuất delta + triage | **Xong** |
 
 ## Dependencies
 - 01 chặn tất cả: chưa có JSON + CLI device-free thì agent phải parse HTML.
@@ -47,3 +47,13 @@ nhiều app song song và lặp định kỳ.
 - Exit code: 2 khi còn Lệch, 0 khi đủ.
 - 5 dòng Lệch còn lại là thật: 2 ID `306_onb4_n_inter*` + `inter_feature_high`
   không có trong APK; `inter_result*` thì placement không tồn tại trong build.
+
+## Kết quả Phase 03 + 04 (đo thật)
+- `audit_runner.py` chạy 3 lần liên tiếp: lần 1 audit (64/76, 12 dòng mới lệch),
+  lần 2 **bỏ qua** vì versionCode 33 chưa đổi, lần 3 `--force` → không đổi.
+- Triage tách đúng: 5 dòng "không có trong build" (5 lỗi thật) + 7 dòng "chưa
+  thấy trong log" (mục thông số kỹ thuật, do lượt đó chạy APK-only).
+- Bug bắt được: file triage từng trùng tên với file snapshot nên ghi đè baseline
+  → mất lịch sử. Đã đổi thành `<package>-triage.json`, có test chặn.
+- Còn lại: cron thực tế (chạy `audit_runner.py` theo lịch) và chạy thử workflow
+  agent — cả hai chưa bật.
