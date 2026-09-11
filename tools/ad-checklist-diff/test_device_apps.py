@@ -38,10 +38,10 @@ def test_labels_are_read_once_and_cached(tmp_path, monkeypatch):
         reads.append(package)
         return f"App {package}"
 
-    found = labels(["com.a"], read_label_fn=fake_read, version_fn=lambda p: "7")
+    found = labels(["com.a"], read_label_fn=fake_read, versions={"com.a": "7"})
     assert found == {"com.a": "App com.a"}
 
-    again = labels(["com.a"], read_label_fn=fake_read, version_fn=lambda p: "7")
+    again = labels(["com.a"], read_label_fn=fake_read, versions={"com.a": "7"})
     assert again == {"com.a": "App com.a"}
     assert reads == ["com.a"]  # lần hai đọc từ cache
 
@@ -49,11 +49,38 @@ def test_labels_are_read_once_and_cached(tmp_path, monkeypatch):
 def test_a_new_build_invalidates_the_cached_label(tmp_path, monkeypatch):
     # An update can rename the app; a label pinned to the old build would lie.
     _cache_at(tmp_path, monkeypatch, {"com.a": {"version_code": "7", "label": "Cũ"}})
-    found = labels(["com.a"], read_label_fn=lambda p, s=None: "Mới", version_fn=lambda p: "8")
+    found = labels(["com.a"], read_label_fn=lambda p, s=None: "Mới", versions={"com.a": "8"})
     assert found == {"com.a": "Mới"}
 
 
 def test_an_app_whose_label_cannot_be_read_is_skipped_not_faked(tmp_path, monkeypatch):
     _cache_at(tmp_path, monkeypatch)
-    found = labels(["com.a"], read_label_fn=lambda p, s=None: None, version_fn=lambda p: "7")
+    found = labels(["com.a"], read_label_fn=lambda p, s=None: None, versions={"com.a": "7"})
     assert found == {}
+
+
+def test_versions_come_back_in_one_call(monkeypatch):
+    # Asking per package cost an adb round trip each: 2 seconds across 85 apps,
+    # spent only on deciding whether cached labels were still good.
+    out = (
+        "package:com.a versionCode:24\n"
+        "package:com.b versionCode:1250186747\n"
+        "rác không theo định dạng\n"
+    )
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return type("R", (), {"stdout": out})()
+
+    monkeypatch.setattr(device_apps.subprocess, "run", fake_run)
+    assert device_apps.installed_versions() == {"com.a": "24", "com.b": "1250186747"}
+    assert len(calls) == 1
+
+
+def test_a_dead_adb_gives_no_versions_rather_than_crashing(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("no device")
+
+    monkeypatch.setattr(device_apps.subprocess, "run", boom)
+    assert device_apps.installed_versions() == {}

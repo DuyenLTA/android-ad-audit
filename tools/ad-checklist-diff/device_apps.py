@@ -15,14 +15,16 @@ same versionCode costs nothing.
 """
 import json
 import os
+import re
 import subprocess
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 
-from apk_source import CACHE_DIR, device_apk_path, device_version_code, find_aapt2
+from apk_source import CACHE_DIR, device_apk_path, find_aapt2
 from app_label import LABEL_RE
 
 LABEL_CACHE = os.path.join(CACHE_DIR, "app-labels.json")
+VERSION_RE = re.compile(r"^package:(\S+)\s+versionCode:(\S+)$")
 ENTRIES = ("AndroidManifest.xml", "resources.arsc")
 
 
@@ -40,6 +42,28 @@ def installed_packages(serial: str | None = None) -> list[str]:
         for line in out.splitlines()
         if line.strip().startswith("package:")
     )
+
+
+def installed_versions(serial: str | None = None) -> dict[str, str]:
+    """versionCode of every third-party package, in one call.
+
+    Asking per package cost an adb round trip each -- 2 seconds across a phone
+    holding 85 apps, spent entirely on deciding whether a cached label was still
+    good. The package manager will list them all at once.
+    """
+    cmd = ["adb"] + (["-s", serial] if serial else []) + [
+        "shell", "cmd", "package", "list", "packages", "-3", "--show-versioncode",
+    ]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=30).stdout
+    except (subprocess.SubprocessError, OSError):
+        return {}
+    versions = {}
+    for line in out.splitlines():
+        found = VERSION_RE.match(line.strip())
+        if found:
+            versions[found.group(1)] = found.group(2)
+    return versions
 
 
 def _entry_bytes(apk_path: str, entry: str, serial: str | None) -> bytes:
@@ -108,13 +132,15 @@ def labels(
     serial: str | None = None,
     workers: int = 4,
     read_label_fn=read_label,
-    version_fn=device_version_code,
+    versions: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Launcher label per package, reading only what the cache is missing."""
     cache = _load_cache()
+    if versions is None:
+        versions = installed_versions(serial)
     known, wanted = {}, []
     for package in packages:
-        version = version_fn(package)
+        version = versions.get(package)
         entry = cache.get(package)
         if entry and entry.get("version_code") == version and entry.get("label"):
             known[package] = entry["label"]
