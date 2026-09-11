@@ -219,6 +219,19 @@ python find_app.py --device Nexus
 → ai.photogenerator.aivideo.aivideogenerator.aiart  (Nexus AI - AI Video Generator)
 ```
 
+Kèm luôn `gid` của tab checklist, và `--add` thì tự ghi entry vào `apps.json`:
+
+```
+python find_app.py --device --add Nexus
+→ Đã thêm vào registry: Nexus AI - AI Video Generator (gid=0)
+  ai.photogenerator.aivideo.aivideogenerator.aiart  (Nexus AI - AI Video Generator)  gid=0
+```
+
+Không phải khai `gid` bằng tay: mỗi tab có dòng `Package name` của chính nó nên
+tab thuộc app nào là đọc được. Tên tab là mã dự án, không khớp tên app, và
+không cần khớp. Hai tab cùng khai một app, hoặc sheet không có tab nào cho app
+đó, thì nó **không ghi gì** và nói rõ — chọn bừa là đối chiếu nhầm checklist.
+
 Đọc nhãn launcher của mọi app bên thứ ba đang cài. Không pull cả APK 50MB: máy
 có `unzip` nên chỉ lấy `AndroidManifest.xml` + `resources.arsc` (~3,5MB), ghép
 lại thành APK rút gọn cho `aapt2` đọc. ~15 giây cho 85 app lần đầu, sau đó cache

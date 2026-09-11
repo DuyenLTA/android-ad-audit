@@ -39,9 +39,23 @@ máy, sau đó có cache nên vài giây.
 Người ta gõ cái họ nhìn thấy: "Nexus", không phải nickname nội bộ "AI Art", càng
 không phải package id.
 
-Tìm thấy trên máy nhưng **không có trong registry** thì dừng lại: audit cần
-`gid` của tab checklist trong sheet, không đoán được. Báo package tìm được rồi
-hỏi người dùng `gid`, xong thêm entry vào `apps.json`.
+Thêm `--add` vào lệnh thứ hai để app tìm được tự vào registry:
+
+```
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<tên>"
+```
+
+`gid` không phải hỏi: mỗi tab trong sheet có dòng `Package name` của chính nó,
+nên tab nào thuộc app nào là **đọc được**, không đoán. Tên tab là mã dự án, đừng
+cố khớp nó với tên app.
+
+Dòng in ra có `gid=<số>` là xong, chạy tiếp. Hai trường hợp phải **dừng và hỏi
+người dùng**, đừng tự chọn:
+
+- `gid=? (… nhiều tab cùng khai app này)` — sheet có 2 tab cho cùng app, chọn
+  bừa là đối chiếu nhầm checklist
+- `gid=? (sheet không có tab nào khai package này)` — app đang cài nhưng chưa có
+  checklist; không có gì để đối chiếu
 
 Theo exit code:
 
