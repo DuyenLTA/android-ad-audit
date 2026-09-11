@@ -89,12 +89,22 @@ nhiều app song song và lặp định kỳ.
 - 2 "ID lạ mới" mà pass deterministic bắt được chính là ID build đang dùng --
   hai lớp độc lập chỉ vào cùng một chỗ.
 
+## Khoảng hở filter -- đã đóng
+- Dòng `D TAG : loadInterstitialAd: <high> - <normal>` không khớp filter nào
+  trong 6 filter cũ, nên nửa normal của cặp (`5307742543`) không vào
+  `trusted_values` và không hiện ở `leftover_ids`. Không phải lỗi
+  `extract_values` -- nó đã `finditer` mọi ID trên dòng.
+- Người dùng chốt thêm `loadInterstitialAd` vào `DEFAULT_FILTERS`. Đo trên đúng
+  log capture: **71/76 không đổi, 0 dòng đổi trạng thái** (không sinh "Khớp"
+  giả -- đây là rủi ro chính của việc nới filter), `5307742543` vào đúng
+  `leftover_ids`. Baseline snapshot đã chạy lại để lượt sau không báo nhầm ID
+  này là "ID lạ mới".
+- Gộp kèm: GUI có list filter riêng trùng nội dung với CLI. Sửa một chỗ là hai
+  bên lệch nhau, nên `streamlit_app.FILTERS` giờ trỏ thẳng vào
+  `check_ads.DEFAULT_FILTERS`, có test chặn.
+
 ## Việc còn lại
-- **Khoảng hở filter (cần người quyết).** Dòng
-  `D TAG : loadInterstitialAd: <high> - <normal>` không khớp filter nào trong 6
-  filter mặc định, nên `5307742543` không vào `trusted_values` và không hiện ở
-  `leftover_ids`. Không phải lỗi `extract_values` (nó đã `finditer` mọi ID trên
-  dòng). Thêm filter = nới định nghĩa "dòng tin cậy" -- repo từng revert đúng
-  loại thay đổi này, nên không tự sửa.
 - Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không
   phải của tool.
+- Push: credential hiện tại (`DuyenLTA`) không có quyền ghi vào
+  `LuuThiAnDuyen/android-ad-audit`, commit đang nằm local.

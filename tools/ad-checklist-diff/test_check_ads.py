@@ -1,5 +1,6 @@
 import check_ads
 from check_ads import (
+    DEFAULT_FILTERS,
     diff,
     extract_key_cooccurrences,
     extract_key_value_pairs,
@@ -103,6 +104,30 @@ def test_load_trusted_lines_reports_zero_matches_per_filter(tmp_path):
     trusted = load_trusted_lines(str(log), ["TAG_A", "TAG_B"])
     assert len(trusted["TAG_A"]) == 2
     assert trusted["TAG_B"] == []
+
+
+def test_default_filters_catch_the_bare_tag_interstitial_load(tmp_path):
+    # The FO interstitial loads its high/normal pair under a plain `D TAG`, which
+    # none of the tag-based filters match. Without this filter the normal half of
+    # the pair never entered the capture's value set, so an ad unit the build
+    # really loads looked like it had never been seen.
+    log = tmp_path / "capture.log"
+    log.write_text(
+        "09-11 11:51:47.924 16884 16884 D TAG     : loadInterstitialAd: "
+        "ca-app-pub-4973559944609228/6620824217 - ca-app-pub-4973559944609228/5307742543\n",
+        encoding="utf-8",
+    )
+    by_filter = load_trusted_lines(str(log), DEFAULT_FILTERS)
+    values = extract_values([line for group in by_filter.values() for line in group])
+    assert "ca-app-pub-4973559944609228/5307742543" in values
+    assert "ca-app-pub-4973559944609228/6620824217" in values
+
+
+def test_gui_and_cli_share_one_filter_list():
+    # Two copies drift, and then the same row reads Khớp in one and Lệch in the other.
+    import streamlit_app
+
+    assert streamlit_app.FILTERS is DEFAULT_FILTERS
 
 
 def test_sheet_csv_url_preserves_gid():

@@ -15,29 +15,14 @@ from pathlib import Path
 
 import streamlit as st
 
-from check_ads import render_html
+from check_ads import DEFAULT_FILTERS, render_html
 from artifact_link import is_stale, read_link
 from audit_pipeline import run_audit
 
-# Locked to this org's standard logcat filters -- not user-editable.
-# UserMessagingPlatform/AdsConsentManager catch the AdMob App ID's own log
-# line, which FOR_TESTER/VslTemplate4FirstOpenSDK never print.
-# RemoteConfigRepository catches the "ID ads inapp" placement flags (e.g.
-# `key=show_native_loading_high, value=true`), which have no dedicated tag
-# of their own -- just a generic config dump at app start. inter_ads catches
-# the interstitial high/normal price-floor decision (e.g.
-# `loadDoubleIds: canShowHigh=true (key=X), canShowNormal=true (key=Y)`),
-# which is where the mismatch-note co-occurrence hints come from for those
-# rows. If a future app needs different filter names, change this list (or
-# use the CLI's --filter flag directly for one-off apps that differ).
-FILTERS = [
-    "FOR_TESTER",
-    "VslTemplate4FirstOpenSDK",
-    "UserMessagingPlatform",
-    "AdsConsentManager",
-    "RemoteConfigRepository",
-    "inter_ads",
-]
+# Not user-editable here: the GUI runs the same filters as the CLI, from the
+# one list in check_ads.py (see the reasoning beside it). An app that needs
+# different filter names is a CLI run with --filter.
+FILTERS = DEFAULT_FILTERS
 
 # Same token system as report_renderer.py's HTML report, translated into a
 # light CSS overlay for Streamlit's own chrome -- keeps the local GUI and

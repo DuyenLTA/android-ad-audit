@@ -18,12 +18,13 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
 - Does not fuzzy-match labels -- only exact value presence, plus the
   narrowly-scoped fallbacks documented under "Reading the result" below.
 - Cannot verify things that never appear inside a trusted (`--filter`-matched)
-  line, **in the CLI**. The GUI's fixed filter list (`FOR_TESTER`,
-  `VslTemplate4FirstOpenSDK`, `UserMessagingPlatform`, `AdsConsentManager`,
-  `RemoteConfigRepository`, `inter_ads`) covers every area the Nexus app
-  checklist needs; a plain CLI run with only the first two will still show
-  the App ID, Package name, and "ID ads inapp" rows as "Lệch" even when
-  correct -- use the GUI, or add the extra `--filter` values by hand.
+  line. CLI and GUI share one filter list (`DEFAULT_FILTERS` in `check_ads.py`:
+  `FOR_TESTER`, `VslTemplate4FirstOpenSDK`, `UserMessagingPlatform`,
+  `AdsConsentManager`, `RemoteConfigRepository`, `inter_ads`,
+  `loadInterstitialAd`), which covers every area the Nexus app checklist needs.
+  Passing `--filter` by hand *replaces* that list, so a run with only
+  `FOR_TESTER` will show the App ID, Package name, and "ID ads inapp" rows as
+  "Lệch" even when they are correct.
 - Package name is verified separately via `adb shell pm list packages`
   (GUI only) since it's never printed in any log line at all.
 - The AdMob **App ID** and the ad unit IDs of placements a capture never

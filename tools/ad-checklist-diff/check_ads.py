@@ -196,6 +196,22 @@ def print_summary(result: dict, empty_filters: list[str]) -> None:
             print(f"  - {v}")
 
 
+# The org's standard logcat filters -- the single list, shared by the CLI and
+# the GUI, because two copies drift and then a row reads "Khớp" in one and
+# "Lệch" in the other.
+#
+# Why each one is here:
+#   FOR_TESTER, VslTemplate4FirstOpenSDK -- the tester build's own ad dump.
+#   UserMessagingPlatform, AdsConsentManager -- the AdMob App ID's log line,
+#     which the two above never print.
+#   RemoteConfigRepository -- the "ID ads inapp" placement flags, which have no
+#     tag of their own (just a config dump at app start).
+#   inter_ads -- the interstitial high/normal price-floor decision, the source
+#     of the co-occurrence hints in mismatch notes.
+#   loadInterstitialAd -- the FO interstitial loads its high/normal pair on a
+#     bare `D TAG` line that matches nothing above, so the normal half of the
+#     pair never reached the capture's value set: an ad unit the build really
+#     loads went unlisted in leftover_ids and looked like it was never seen.
 DEFAULT_FILTERS = [
     "FOR_TESTER",
     "VslTemplate4FirstOpenSDK",
@@ -203,6 +219,7 @@ DEFAULT_FILTERS = [
     "AdsConsentManager",
     "RemoteConfigRepository",
     "inter_ads",
+    "loadInterstitialAd",
 ]
 
 EXIT_OK = 0
