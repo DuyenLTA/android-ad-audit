@@ -301,7 +301,9 @@ khác `report_renderer.py` (trang cho người chạy tool): nó mở đầu b�
 .venv/bin/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
   --findings out/<package>-findings.html \
   --notes    out/<package>-notes.html \
-  --highlight 2733004612
+  --highlight 2733004612 \
+  --run wf_8f6c22cc-5a6 --mode capture \
+  --report plans/reports/<báo cáo của lượt này>.md
 ```
 
 Phần sinh từ snapshot: điểm số, chip từng section, bảng đầy đủ mọi dòng, danh
@@ -313,3 +315,11 @@ thành bịa. Không truyền cũng chạy, ra trang thuần cơ học.
 ngược về đó trong danh sách leftover, phần còn lại để trống chứ không đoán.
 
 Tên app lấy từ `label` trong `apps.json`; không có entry thì dùng package.
+
+`--run`, `--mode`, `--report` là ba thứ không có chỗ nào trên đĩa ghi lại, nên
+phải truyền vào. Còn `delta` và cảnh báo về lượt capture thì builder tự đọc từ
+`out/<package>-triage.json` -- trước đây gõ tay vào template, nên đã có lần một
+trang khai "delta: không đổi" cạnh run id của lượt khác. Triage có
+`missed_home` không rỗng (hoặc `null`, hoặc `empty_filters` không rỗng) thì
+trang hiện cảnh báo ngay dưới tiêu đề: người đọc phải thấy trang này dựng trên
+một lượt capture dở dang.

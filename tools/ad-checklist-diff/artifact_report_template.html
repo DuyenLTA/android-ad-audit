@@ -159,16 +159,17 @@
 <div class="wrap">
 
   <header class="masthead">
-    <div class="eyebrow">Ad checklist diff + audit fan-out · wf_3e37692f-ce4</div>
+    <div class="eyebrow">Ad checklist diff + audit fan-out · {{RUN}}</div>
     <h1>Đối chiếu ads — {{TITLE}}</h1>
     <div class="pkg">{{PKG}} · versionCode {{VC}}</div>
     <div class="runmeta">
       <span>audit <b>{{AUDITED_AT}}</b></span>
-      <span>fan-out: 2 agents · <b>0 lỗi</b></span>
-      <span>mode: <b>--skip</b> (phán lại trên triage sẵn có)</span>
-      <span>delta: <b>không đổi</b></span>
+      <span>mode: <b>{{MODE}}</b></span>
+      <span>delta: <b>{{DELTA}}</b></span>
     </div>
   </header>
+
+  {{CAPTURE_WARNING}}
 
   <div class="score">
     <div class="score-top">
@@ -194,7 +195,7 @@
 
   <footer class="colophon">
     <span>Nguồn: snapshots/{{PKG}}.json · out/…-triage.json · out/…-capture.log · .cache/ad-checklist-diff/…-{{VC}}.apk</span>
-    <span>plans/reports/audit-fanout-260911-1720-photogenerator-inter-feature-high-rerun-report.md</span>
+    <span>{{REPORT}}</span>
   </footer>
 
 </div>

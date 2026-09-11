@@ -15,6 +15,8 @@ import html
 import json
 from pathlib import Path
 
+from artifact_run_context import capture_warning, delta_note, mode_label
+
 HERE = Path(__file__).parent
 TEMPLATE = HERE / "artifact_report_template.html"
 
@@ -103,6 +105,10 @@ def render(
     findings_html: str = "",
     notes_html: str = "",
     highlight: tuple[str, ...] = (),
+    triage: dict | None = None,
+    run: str = "",
+    mode: str = "",
+    report: str = "",
     template_path: Path = TEMPLATE,
 ) -> str:
     sections = snapshot["result"]["sections"]
@@ -129,6 +135,13 @@ def render(
         "LEFTOVER": _leftover_html(leftover, highlight),
         "FINDINGS": findings_html,
         "NOTES": notes_html,
+        # Bối cảnh của đúng lượt này -- trước đây gõ tay vào template, nên một
+        # trang từng khai "delta: không đổi" cạnh run id của lượt khác.
+        "RUN": html.escape(run) if run else "không rõ run",
+        "MODE": html.escape(mode_label(mode)),
+        "DELTA": html.escape(delta_note(triage)),
+        "REPORT": html.escape(report),
+        "CAPTURE_WARNING": capture_warning(triage),
     }
     page = template_path.read_text(encoding="utf-8")
     for key, value in fields.items():
@@ -144,6 +157,10 @@ def main() -> None:
     parser.add_argument("--findings", help="HTML fragment: this run's fan-out findings")
     parser.add_argument("--notes", help="HTML fragment: ghi chú + câu hỏi chưa giải quyết")
     parser.add_argument("--highlight", nargs="*", default=[], help="leftover IDs the findings explain")
+    parser.add_argument("--run", default="", help="ID lượt workflow, ví dụ wf_8f6c22cc-5a6")
+    parser.add_argument("--mode", default="", choices=["", "capture", "apk", "skip"])
+    parser.add_argument("--report", default="", help="đường dẫn báo cáo markdown của lượt này")
+    parser.add_argument("--triage", help="mặc định: out/<package>-triage.json")
     parser.add_argument("--out", help="default: out/<package>-artifact.html")
     args = parser.parse_args()
 
@@ -155,6 +172,15 @@ def main() -> None:
     findings = Path(args.findings).read_text(encoding="utf-8") if args.findings else ""
     notes = Path(args.notes).read_text(encoding="utf-8") if args.notes else ""
 
+    # Thiếu triage thì trang vẫn dựng được, chỉ là không khai được delta và
+    # không cảnh báo được gì về lượt capture.
+    triage_path = Path(args.triage or HERE / "out" / f"{args.package}-triage.json")
+    triage = (
+        json.loads(triage_path.read_text(encoding="utf-8"))
+        if triage_path.exists()
+        else None
+    )
+
     out = Path(args.out or HERE / "out" / f"{args.package}-artifact.html")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
@@ -164,6 +190,10 @@ def main() -> None:
             findings_html=findings,
             notes_html=notes,
             highlight=tuple(args.highlight),
+            triage=triage,
+            run=args.run,
+            mode=args.mode,
+            report=args.report,
         ),
         encoding="utf-8",
     )
