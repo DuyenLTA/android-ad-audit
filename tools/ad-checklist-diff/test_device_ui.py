@@ -1,4 +1,4 @@
-from device_ui import find_close_center, find_node_center, focused_activity, screen_size
+from device_ui import find_node_center, focused_activity, screen_size
 
 LANGUAGE_XML = """<hierarchy>
 <node resource-id="com.x:id/buttonLanguageNext" text="" enabled="false" bounds="[922,139][1066,283]" />
@@ -24,27 +24,6 @@ def test_recycled_zero_area_nodes_are_skipped():
 
 def test_missing_node_returns_none():
     assert find_node_center(LANGUAGE_XML, resource_id="id/nope") is None
-
-
-AD_XML = """<hierarchy>
-<node class="android.widget.TextView" text="Fechar" content-desc="" bounds="[144,1968][300,2067]" />
-<node class="android.view.View" text="" content-desc="More" bounds="[567,1953][1023,2082]" />
-</hierarchy>"""
-
-
-def test_close_control_matched_in_the_ad_creatives_own_language():
-    # A real interstitial rendered its close control as Portuguese "Fechar"
-    # inside an app set to another language entirely.
-    assert find_close_center(AD_XML) == (222, 2017)
-
-
-def test_close_control_matched_by_content_desc():
-    xml = '<node text="" content-desc="Close Billing Screen" bounds="[40,100][140,200]" />'
-    assert find_close_center(xml) == (90, 150)
-
-
-def test_no_close_control_returns_none():
-    assert find_close_center('<node text="More" content-desc="" bounds="[0,0][10,10]" />') is None
 
 
 def test_focused_activity_parsed_from_dumpsys():

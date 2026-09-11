@@ -94,47 +94,6 @@ def find_node_center(
     return None
 
 
-# An interstitial's close control is whatever the ad creative's own locale
-# calls it -- a real run showed a Portuguese "Fechar" inside an app whose
-# language had just been set to something else entirely -- so matching one
-# English label is not enough. Countdown-then-close means the control is also
-# absent for the first few seconds.
-CLOSE_LABELS = {
-    "close", "fechar", "cerrar", "fermer", "schliessen", "schließen", "chiudi",
-    "закрыть", "đóng", "tutup", "关闭", "關閉", "닫기", "閉じる", "बंद करें",
-    "skip", "bỏ qua", "saltar", "pular",
-}
-
-
-def _looks_like_close(value: str) -> bool:
-    """Whether a label reads as close/skip, in any of the locales seen.
-
-    Substring, not equality: real controls say "Skip ad", "Bỏ qua quảng cáo",
-    "Close ad" rather than the bare word. Long strings are ignored so ad body
-    copy that merely mentions the word cannot be mistaken for the control.
-    """
-    value = value.strip().lower()
-    if not value or len(value) > 24:
-        return False
-    return any(label in value for label in CLOSE_LABELS)
-
-
-def find_close_center(xml: str) -> tuple[int, int] | None:
-    """Centre of a close/skip control, matched across locales."""
-    for node in NODE_RE.findall(xml):
-        text = _attr(node, "text")
-        desc = _attr(node, "content-desc")
-        if _looks_like_close(text) or _looks_like_close(desc):
-            b = BOUNDS_RE.search(node)
-            if not b:
-                continue
-            x1, y1, x2, y2 = (int(g) for g in b.groups())
-            if x2 <= x1 or y2 <= y1:
-                continue
-            return (x1 + x2) // 2, (y1 + y2) // 2
-    return None
-
-
 def _attr(node: str, name: str) -> str:
     m = re.search(rf'{name}="([^"]*)"', node)
     return m.group(1) if m else ""

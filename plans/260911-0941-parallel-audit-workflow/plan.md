@@ -154,6 +154,22 @@ nhiều app song song và lặp định kỳ.
   chỉ bật khi đã chọn), qua thẳng Onboarding.
   Kèm theo: nút Next của app này là `imageButtonLanguageNext`, app kia là
   `buttonLanguageNext` -- khớp theo hậu tố nên không trùng nhau; liệt kê cả hai.
+- **Tap nhầm vào quảng cáo.** 3 lần trong một lượt bị văng sang YouTube. Bằng
+  chứng: `input tap 309 814` trên màn 1080x2148, 0,7s sau WebView bắn intent
+  youtube.com. Giữa màn là chỗ của creative, không phải nút đóng. Nay nút đóng
+  phải vừa khớp nhãn vừa **sát mép và nhỏ**; không tìm thấy thì trả None để
+  driver bấm BACK -- BACK không bao giờ mở được quảng cáo.
+  Nhận thêm nút chỉ có ký hiệu (`✕`, `×`, `x`) và id của khung ads
+  (`interstitial_close_button`, `btnClose`...); id tin hơn nhãn, vì creative tự
+  vẽ chữ "Close" ở đâu cũng được. Ký hiệu khớp nguyên chuỗi chứ không substring
+  -- "x" nằm trong "Next".
+- Bắt được 2 con ads thật để soi cây: node nội dung ads ở **(361, 814)**, đúng
+  hàng mà lượt lỗi đã tap; nút đóng thật là `text="Close"` ở (223, 1837), ngay
+  cạnh nút CTA `desc="More"` (795, 1837) -- lệch chút là bấm vào CTA. Matcher
+  mới trả đúng nút đóng cho cả hai con.
+- Verify trên máy: một lượt gặp **3 interstitial, cả 3 đều đóng được**, 0 lần
+  rời app (2 dòng "youtube" còn lại chỉ là notification bị chặn bubble, không
+  phải START activity).
 
 ## Việc còn lại
 - Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không

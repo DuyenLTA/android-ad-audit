@@ -18,7 +18,8 @@ splash -> language -> onboarding (next, next, swipe, get started) -> question
 """
 from device_language_picker import DEFAULT_LANGUAGE
 from device_language_picker import pick as pick_language
-from device_ui import find_close_center, find_node_center, key_event, swipe_left, tap
+from device_close_button import find_close_center
+from device_ui import find_node_center, key_event, swipe_left, tap
 
 # Any language would reach Home, but the capture is read by people afterwards
 # and a run in हिन्दी is a run nobody can check. See device_language_picker for
