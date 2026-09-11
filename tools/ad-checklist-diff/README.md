@@ -184,11 +184,21 @@ python check_ads.py --sheet <url+gid> --apk build.apk        # không cần devi
 
 ### 3. Audit toàn bộ registry
 
-`apps.json` (xem `apps.example.json`) map mỗi app tới tab sheet của nó:
+`apps.json` (xem `apps.example.json`) khai sheet gốc và map mỗi app tới tab của
+nó trong sheet đó:
+
+```json
+{ "sheet": "https://docs.google.com/spreadsheets/d/<id>/edit",
+  "apps": [ { "label": "AI Beauty", "package": "com.example.app", "gid": "53703266" } ] }
+```
 
 ```
-python audit_runner.py --sheet <url sheet gốc>
+python audit_runner.py
 ```
+
+`--sheet` chỉ cần khi muốn chạy với sheet khác cái registry khai. Dạng cũ (file
+là list các app, không có `"sheet"`) vẫn đọc được, nhưng lúc đó `--sheet` là bắt
+buộc.
 
 App nào `versionCode` chưa đổi so với lần trước thì **bỏ qua** -- cùng build thì
 cùng kết quả. `--force` để chạy lại bất chấp. Mỗi app sinh:
@@ -201,7 +211,7 @@ Phần audit từ APK không đụng device nên chạy song song giữa các ap
 capture cần máy thì phải tuần tự vì chỉ có một máy:
 
 ```
-python audit_runner.py --sheet <url sheet gốc> --capture
+python audit_runner.py --capture
 ```
 
 `--capture` tự lái máy cho từng app (cả hai luồng user) rồi audit trên đúng log
@@ -216,7 +226,7 @@ không cần máy.
 ### 3b. Chạy theo lịch
 
 ```
-AD_AUDIT_SHEET=<url sheet gốc> ./scheduled-audit.sh
+./scheduled-audit.sh
 ```
 
 Wrapper cho cron: ghi mọi lượt vào `out/scheduled-audit.log`, nhưng **chỉ in ra
@@ -227,12 +237,12 @@ lỗi. Log tự cắt ở 5000 dòng.
 Dòng crontab hàng ngày 9h:
 
 ```
-AD_AUDIT_SHEET=https://docs.google.com/spreadsheets/d/<id>/edit
 0 9 * * * /path/to/tools/ad-checklist-diff/scheduled-audit.sh
 ```
 
-Env đổi được: `AD_AUDIT_PYTHON`, `AD_AUDIT_LOG`, `AD_AUDIT_LOG_LINES`,
-`AD_AUDIT_ADB_PATH`.
+URL sheet lấy từ registry, nên không phải khai lại ở đây -- đổi sheet là sửa
+một chỗ. Env đổi được: `AD_AUDIT_SHEET` (chạy sheet khác), `AD_AUDIT_PYTHON`,
+`AD_AUDIT_LOG`, `AD_AUDIT_LOG_LINES`, `AD_AUDIT_ADB_PATH`.
 
 ### 4. Lớp agent (tuỳ chọn)
 

@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from apk_source import base_apk, device_version_code
-from app_registry import load_apps, sheet_url_for
+from app_registry import DEFAULT_REGISTRY, load_apps, registry_sheet, sheet_url_for
 from audit_pipeline import run_audit
 from audit_snapshot import diff_results, load, save, triage
 from check_ads import DEFAULT_FILTERS
@@ -223,7 +223,10 @@ def print_summary(results: list[dict]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit toàn bộ app trong registry")
-    parser.add_argument("--sheet", required=True, help="URL sheet gốc (gid lấy từ registry)")
+    parser.add_argument(
+        "--sheet",
+        help="URL sheet gốc (gid lấy từ registry). Bỏ qua nếu registry đã khai \"sheet\"",
+    )
     parser.add_argument("--registry", help="apps.json (mặc định cạnh file này)")
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--force", action="store_true", help="Chạy cả khi versionCode chưa đổi")
@@ -237,10 +240,21 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=300, help="Giới hạn mỗi luồng khi capture, giây")
     args = parser.parse_args()
 
-    apps = load_apps(args.registry) if args.registry else load_apps()
+    registry = args.registry or DEFAULT_REGISTRY
+    apps = load_apps(registry)
+    # The registry already says which tab each app is; letting it say which
+    # spreadsheet too is what stops the URL being retyped every run and kept in
+    # step by hand wherever the audit is scheduled.
+    sheet = args.sheet or registry_sheet(registry)
+    if not sheet:
+        raise SystemExit(
+            f'Thiếu URL sheet: truyền --sheet, hoặc thêm "sheet" vào {registry} '
+            "(xem apps.example.json)"
+        )
+
     results = run_all(
         apps,
-        args.sheet,
+        sheet,
         out_dir=Path(args.out),
         force=args.force,
         workers=args.workers,

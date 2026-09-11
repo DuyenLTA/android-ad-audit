@@ -1,9 +1,12 @@
-[
-  {
-    "label": "AI Beauty",
-    "package": "com.example.aibeauty",
-    "gid": "53703266",
-    "splash_tap": null,
-    "home_match": "MainActivity"
-  }
-]
+{
+  "sheet": "https://docs.google.com/spreadsheets/d/<sheet-id>/edit",
+  "apps": [
+    {
+      "label": "AI Beauty",
+      "package": "com.example.aibeauty",
+      "gid": "53703266",
+      "splash_tap": null,
+      "home_match": "MainActivity"
+    }
+  ]
+}

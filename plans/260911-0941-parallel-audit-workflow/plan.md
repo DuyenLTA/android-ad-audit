@@ -136,6 +136,12 @@ nhiều app song song và lặp định kỳ.
 - Workflow **không cần URL sheet**: checklist đã nằm sẵn trong snapshot
   (`result.sections`, đủ 76 dòng label+value). Sheet là input của
   `audit_runner.py` ở bước trước.
+- URL sheet trước đó nằm ở 2 chỗ rời nhau (crontab env + `--sheet` gõ tay mỗi
+  lần), registry chỉ giữ `gid` chứ không giữ sheet mà gid trỏ vào. Nay registry
+  nhận thêm dạng `{"sheet": ..., "apps": [...]}`; `--sheet` thành tuỳ chọn, đã
+  bỏ khỏi crontab. Dạng list cũ vẫn đọc được (lúc đó `--sheet` bắt buộc).
+  Chạy thật không kèm `--sheet`: OK. Registry không khai sheet và cũng không
+  truyền `--sheet`: exit 1, báo rõ hai chỗ đặt được.
 
 ## Việc còn lại
 - Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không

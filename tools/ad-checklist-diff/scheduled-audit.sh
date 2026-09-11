@@ -5,9 +5,10 @@
 # gì đổi: mọi lượt đều ghi vào log, nhưng chỉ in ra khi audit_runner báo có
 # dòng mới lệch (exit 2) hoặc lỗi (exit 1). Đúng tinh thần "chỉ báo thay đổi".
 #
-# Dùng:
-#   AD_AUDIT_SHEET=<url sheet gốc> ./scheduled-audit.sh
+# URL sheet thường nằm sẵn trong apps.json ("sheet"), nên không cần truyền gì.
+# Chỉ truyền khi muốn chạy với sheet khác:
 #   ./scheduled-audit.sh <url sheet gốc>
+#   AD_AUDIT_SHEET=<url sheet gốc> ./scheduled-audit.sh
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,10 +17,6 @@ PYTHON="${AD_AUDIT_PYTHON:-$DIR/../../.venv/bin/python}"
 LOG="${AD_AUDIT_LOG:-$DIR/out/scheduled-audit.log}"
 MAX_LOG_LINES="${AD_AUDIT_LOG_LINES:-5000}"
 
-if [ -z "$SHEET" ]; then
-  echo "Thiếu URL sheet: đặt AD_AUDIT_SHEET hoặc truyền làm tham số đầu" >&2
-  exit 64
-fi
 if [ ! -x "$PYTHON" ]; then
   echo "Không thấy python: $PYTHON (đặt AD_AUDIT_PYTHON)" >&2
   exit 64
@@ -39,7 +36,11 @@ if [ "$(adb get-state 2>/dev/null)" != "device" ]; then
   exit 0
 fi
 
-output="$(cd "$DIR" && "$PYTHON" audit_runner.py --sheet "$SHEET" 2>&1)"
+# Không có sheet ở đây thì audit_runner lấy từ registry -- và nếu registry cũng
+# không khai thì chính nó báo lỗi, nói rõ hai chỗ đặt được.
+sheet_args=()
+[ -n "$SHEET" ] && sheet_args=(--sheet "$SHEET")
+output="$(cd "$DIR" && "$PYTHON" audit_runner.py "${sheet_args[@]}" 2>&1)"
 status=$?
 
 {
