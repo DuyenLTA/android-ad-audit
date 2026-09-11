@@ -143,6 +143,18 @@ nhiều app song song và lặp định kỳ.
   Chạy thật không kèm `--sheet`: OK. Registry không khai sheet và cũng không
   truyền `--sheet`: exit 1, báo rõ hai chỗ đặt được.
 
+## Hai lỗi driver bắt được khi chạy trên app thứ hai
+- **Chọn nhầm ngôn ngữ.** Rule cũ bấm "checkbox đầu tiên"; trên màn thật thì
+  Français và English là hàng *bung ra* (`iconExpandLanguageItem`), checkbox đầu
+  tiên là हिन्दी (India) -- nên cả lượt capture chạy bằng tiếng Hindi, không ai
+  đọc được. Nay: bung hàng English rồi lấy biến thể đầu trong đó (dò theo vị trí
+  chứ không theo tên, vì build khác ghi "English (US)" hay "English (United
+  States)" là hai chuyện). Không có English thì rơi về checkbox đầu -- tới được
+  Home vẫn hơn kẹt. Đo thật 2 lượt: chọn đúng English (US), nút Next ăn (nút này
+  chỉ bật khi đã chọn), qua thẳng Onboarding.
+  Kèm theo: nút Next của app này là `imageButtonLanguageNext`, app kia là
+  `buttonLanguageNext` -- khớp theo hậu tố nên không trùng nhau; liệt kê cả hai.
+
 ## Việc còn lại
 - Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không
   phải của tool.

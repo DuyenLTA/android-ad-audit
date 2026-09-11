@@ -7,6 +7,7 @@ advances instead of repeating its first action forever.
 
 Step kinds:
   {"tap": {...}}   tap a node, matched by resource-id / text / content-desc
+  {"language": "English"}  pick a language, unfolding its variants if needed
   {"swipe": "left"}  page a pager forward
   {"wait": n}      do nothing this step (let an ad or screen settle)
   {"key": "..."}   send a keyevent, the fallback for ad/paywall dismissal
@@ -15,16 +16,19 @@ The order below mirrors the real flow, measured on device:
 splash -> language -> onboarding (next, next, swipe, get started) -> question
 -> interstitial -> paywall -> home.
 """
+from device_language_picker import DEFAULT_LANGUAGE
+from device_language_picker import pick as pick_language
 from device_ui import find_close_center, find_node_center, key_event, swipe_left, tap
 
-# Language rows come in two shapes: ones carrying `checkboxLanguageItem` are
-# selectable directly, while ones carrying `iconExpandLanguageItem` (English,
-# Français…) only *expand* into regional variants -- tapping those selects
-# nothing and leaves the confirm button disabled. Any language will do, so aim
-# at the first real checkbox.
+# Any language would reach Home, but the capture is read by people afterwards
+# and a run in हिन्दी is a run nobody can check. See device_language_picker for
+# why "first checkbox" landed there. The confirm button is `buttonLanguageNext`
+# on some builds and `imageButtonLanguageNext` on others; a tap whose node is
+# absent does nothing, so both are listed rather than guessed between.
 LANGUAGE_STEPS = [
-    {"tap": {"resource_id": "id/checkboxLanguageItem"}},
+    {"language": DEFAULT_LANGUAGE},
     {"tap": {"resource_id": "id/buttonLanguageNext"}},
+    {"tap": {"resource_id": "id/imageButtonLanguageNext"}},
 ]
 
 # Page 3 advances by swipe rather than by the Next button.
@@ -93,6 +97,8 @@ def perform_step(step: dict, xml_fn, run, sleep=None) -> str | None:
     A tap whose node is absent does nothing and reports None, so the driver can
     move on to the next step rather than stalling on a screen that skipped it.
     """
+    if "language" in step:
+        return pick_language(step["language"], xml_fn, run, sleep=sleep)
     if "wait" in step:
         if sleep:
             sleep(step["wait"])
