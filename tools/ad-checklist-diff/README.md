@@ -212,6 +212,18 @@ python find_app.py Nexus
 → ai.photogenerator.aivideo.aivideogenerator.aiart  (Nexus AI - AI Video Generator)
 ```
 
+Không có trong registry cũng tìm được — quét thẳng máy:
+
+```
+python find_app.py --device Nexus
+→ ai.photogenerator.aivideo.aivideogenerator.aiart  (Nexus AI - AI Video Generator)
+```
+
+Đọc nhãn launcher của mọi app bên thứ ba đang cài. Không pull cả APK 50MB: máy
+có `unzip` nên chỉ lấy `AndroidManifest.xml` + `resources.arsc` (~3,5MB), ghép
+lại thành APK rút gọn cho `aapt2` đọc. ~15 giây cho 85 app lần đầu, sau đó cache
+theo `versionCode` nên gần như tức thì.
+
 Khớp cả tên launcher (đọc từ APK đã cache), `label`, `aliases` khai thêm trong
 registry, lẫn package. Exit 0 = đúng một app, 1 = không khớp (in ra danh sách
 có sẵn), 2 = nhiều app khớp, để người chọn chứ không đoán.

@@ -25,15 +25,23 @@ gọi — đường dẫn tương đối là cách chắc chắn nhất để n�
 Không nêu tên app trong `$ARGUMENTS` thì lấy hết registry:
 `<repo>/tools/ad-checklist-diff/apps.json`.
 
-Có nêu tên thì **đừng tự so chuỗi** — chạy:
+Có nêu tên thì **đừng tự so chuỗi** — chạy, theo thứ tự này:
 
 ```
 cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py "<tên>"
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device "<tên>"
 ```
 
-Nó khớp cả tên trên màn hình điện thoại (đọc từ APK đã cache), `label` trong
-registry, `aliases`, lẫn package. Người ta gõ cái họ nhìn thấy trên máy —
-"Nexus" — chứ không gõ nickname nội bộ "AI Art".
+Cái đầu tra registry (tức thì). Exit 1 thì chạy cái thứ hai: nó quét **mọi app
+đang cài trên máy** và khớp theo tên hiện trên icon — lần đầu ~15 giây cho cả
+máy, sau đó có cache nên vài giây.
+
+Người ta gõ cái họ nhìn thấy: "Nexus", không phải nickname nội bộ "AI Art", càng
+không phải package id.
+
+Tìm thấy trên máy nhưng **không có trong registry** thì dừng lại: audit cần
+`gid` của tab checklist trong sheet, không đoán được. Báo package tìm được rồi
+hỏi người dùng `gid`, xong thêm entry vào `apps.json`.
 
 Theo exit code:
 
