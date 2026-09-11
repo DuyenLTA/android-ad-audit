@@ -246,6 +246,9 @@ một chỗ. Env đổi được: `AD_AUDIT_SHEET` (chạy sheet khác), `AD_AUD
 
 ### 4. Lớp agent (tuỳ chọn)
 
+Hướng dẫn workflow (pipeline, cách chạy, đọc kết luận agent, bẫy thường gặp):
+https://claude.ai/code/artifact/d7935fbb-3fe8-48fa-8a70-c56b9c51fa4c
+
 `.claude/workflows/audit-fanout.mjs` -- một agent mỗi app, chỉ đọc các dòng
 trong triage, kết luận (checklist sai / build thiếu / chưa capture đủ) rồi một
 lượt phản biện từng kết luận. Phần diff vẫn là Python: agent không làm lại việc
