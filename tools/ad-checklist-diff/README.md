@@ -264,8 +264,12 @@ Chạy trong Claude Code, mở phiên **tại thư mục gốc repo** rồi gõ:
 ```
 
 `.claude/commands/audit-fanout.md` lo phần đọc registry, gọi workflow, dựng báo
-cáo artifact rồi commit. Không có slash command thì nói bằng lời cũng được,
-miễn có chữ "workflow":
+cáo artifact rồi commit. Nó tự tìm repo root (`git rev-parse`, rồi
+`$AD_AUDIT_REPO`, rồi `~/android-ad-audit`) và truyền đường dẫn tuyệt đối cho
+agent, nên copy sang `~/.claude/commands/` là gõ được từ thư mục bất kỳ.
+
+Không có slash command thì nói bằng lời cũng được, miễn có chữ "workflow" --
+nhưng lúc đó phiên phải mở tại repo root:
 
 ```
 chạy workflow audit-fanout cho các app trong registry

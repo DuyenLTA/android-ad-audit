@@ -38,6 +38,10 @@ export const meta = {
 // capturing, and agents handed those rows argue about bugs that do not exist.
 
 const toolDir = args?.toolDir ?? 'tools/ad-checklist-diff'
+// Agents do not inherit the calling session's CWD, so a run started from
+// anywhere but the repo root has to be told where the repo is. Default '.'
+// keeps a session opened at the root behaving exactly as before.
+const repoDir = args?.repoDir ?? '.'
 const apps = args?.apps ?? []
 const auditMode = args?.audit ?? 'capture'
 const force = args?.force === true
@@ -130,9 +134,9 @@ if (auditMode !== 'skip') {
   // Deliberately one agent running one command: the verdicts stay Python's, and
   // an agent that starts improvising flags is an agent rewriting the audit.
   const audit = await agent(
-    `Chạy đúng một lệnh này từ thư mục gốc của repo, không thêm bớt cờ nào:
+    `Chạy đúng một lệnh này, không thêm bớt cờ nào, không đổi thư mục nào khác:
 
-    .venv/bin/python ${toolDir}/audit_runner.py${flags}
+    cd ${repoDir} && .venv/bin/python ${toolDir}/audit_runner.py${flags}
 
 Nó có thể lái máy thật và mất vài phút -- chờ cho xong, đừng bỏ ngang, đừng
 chạy lại. Báo "build chưa đổi" là ĐÚNG, không phải lỗi: triage cũ vẫn dùng được
