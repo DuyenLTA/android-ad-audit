@@ -16,14 +16,18 @@ def load_trusted_lines(log_path: str, filters: list[str]) -> dict[str, list[str]
     when a given --filter matched zero lines -- a strong signal that this
     run's capture doesn't cover that area at all, distinct from a value
     genuinely being absent from lines that *were* captured.
+
+    Matching is case-sensitive because these are log tags, not free text. A
+    capture that never enabled the tester dump still carried one line reading
+    `config_for_tester: Firebase token: ...` -- unrelated, lowercase, and enough
+    to make a case-insensitive `FOR_TESTER` look covered. The warning stayed
+    silent and five correct rows were reported as mismatched.
     """
     trusted: dict[str, list[str]] = {flt: [] for flt in filters}
-    filters_lower = [(flt, flt.lower()) for flt in filters]
     with open(log_path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
-            low = line.lower()
-            for flt, flt_lower in filters_lower:
-                if flt_lower in low:
+            for flt in filters:
+                if flt in line:
                     trusted[flt].append(line)
     return trusted
 

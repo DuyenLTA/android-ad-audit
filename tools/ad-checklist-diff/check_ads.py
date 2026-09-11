@@ -227,6 +227,9 @@ DEFAULT_FILTERS = [
     "inter_ads",
     "loadInterstitialAd",
     "setupAdjust",
+    # `setupAdjust` chỉ in environment; app token và các event token đi qua tag
+    # này, nên thiếu nó là cả mục Adjust báo lệch dù cấu hình đúng.
+    "AdSdkAdjust",
 ]
 
 EXIT_OK = 0

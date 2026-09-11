@@ -127,3 +127,49 @@ def test_ephemeral_apk_is_deleted_after_use(tmp_path):
     result = _result([{"label": "X", "value": "ca-app-pub-111/222", "found": False, "note": None}])
     verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, True))
     assert not os.path.exists(apk)
+
+
+def test_token_like_accepts_opaque_tokens_and_rejects_words():
+    from apk_verifier import is_token_like
+
+    assert is_token_like("uz6fb8kyeww0")                      # Adjust app token
+    assert is_token_like("y9idfz")                            # Adjust event token
+    assert is_token_like("1676822933375650")                  # Facebook app id
+    assert is_token_like("b0fec8b50648f21fecccce7125c0e349")  # client token
+    # "production" appears in every APK ever built; calling that a match would
+    # pass a row nobody checked.
+    assert not is_token_like("production")
+    assert not is_token_like("true")
+    assert not is_token_like("vi")
+    assert not is_token_like("ai.photogenerator.aivideo.aiart")
+
+
+def test_a_token_compiled_into_the_build_stops_reading_as_a_mismatch(monkeypatch, tmp_path):
+    import apk_verifier
+
+    result = {"sections": {"S": [
+        {"label": "Adjust config token", "value": "uz6fb8kyeww0", "alt_values": [], "found": False, "note": None},
+        {"label": "Adjust config environment", "value": "production", "alt_values": [], "found": False, "note": None},
+    ]}}
+    monkeypatch.setattr(apk_verifier, "apk_contains", lambda path, needles: {n: ["classes.dex"] for n in needles})
+    apk_verifier.verify_apk_rows(result, "com.a", apk_fn=lambda pkg: (str(tmp_path / "a.apk"), False))
+
+    token, environment = result["sections"]["S"]
+    assert token["found"] is True
+    assert "có trong build" in token["note"]
+    # The plain word was never swept, so it stays unverified rather than passing.
+    assert environment["found"] is False
+
+
+def test_a_token_absent_from_the_build_says_so(monkeypatch, tmp_path):
+    import apk_verifier
+
+    result = {"sections": {"S": [
+        {"label": "Adjust config token", "value": "uz6fb8kyeww0", "alt_values": [], "found": False, "note": None},
+    ]}}
+    monkeypatch.setattr(apk_verifier, "apk_contains", lambda path, needles: {n: [] for n in needles})
+    apk_verifier.verify_apk_rows(result, "com.a", apk_fn=lambda pkg: (str(tmp_path / "a.apk"), False))
+
+    row = result["sections"]["S"][0]
+    assert row["found"] is False
+    assert "không tồn tại trong build" in row["note"]

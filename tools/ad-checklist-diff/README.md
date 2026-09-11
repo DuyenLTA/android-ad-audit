@@ -25,6 +25,15 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   Passing `--filter` by hand *replaces* that list, so a run with only
   `FOR_TESTER` will show the App ID, Package name, and "ID ads inapp" rows as
   "Lệch" even when they are correct.
+- Giá trị dạng token mà log không bao giờ in (Adjust app token, Facebook App ID
+  / Client Token) được đối chiếu thẳng với APK, vì chúng được compile vào build.
+  Chỉ áp dụng cho chuỗi đủ đặc trưng -- có cả chữ lẫn số, hoặc dãy số dài. Một
+  từ thường như `production` thì KHÔNG, vì APK nào cũng có nó và "khớp" như vậy
+  là cho qua một dòng không ai kiểm.
+- `--filter` khớp **phân biệt hoa thường**: đây là tag log, không phải free
+  text. `FOR_TESTER` không được khớp `config_for_tester` -- một dòng Firebase
+  lạc kiểu đó từng làm cảnh báo "filter khớp 0 dòng" im lặng, và 5 dòng cấu hình
+  đúng bị báo lệch.
 - Package name is verified separately via `adb shell pm list packages`
   (GUI only) since it's never printed in any log line at all.
 - The AdMob **App ID** and the ad unit IDs of placements a capture never
@@ -210,7 +219,8 @@ cùng kết quả. `--force` để chạy lại bất chấp. Mỗi app sinh:
 Hỏi bản cài có chứa chuỗi nào không, không cần agent:
 
 ```
-python apk_strings.py <package> show_inter_feature 4070123043
+python apk_strings.py --package <package> show_inter_feature 4070123043
+python apk_strings.py --apk build.apk show_inter_feature 4070123043
 ```
 
 Quét cả UTF-8 lẫn UTF-16LE trong mọi entry, xong dưới một giây, in ra entry

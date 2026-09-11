@@ -29,7 +29,7 @@ import re
 import subprocess
 import zipfile
 
-from apk_source import apk_ad_ids, base_apk, find_aapt2, manifest_app_id
+from apk_source import apk_ad_ids, apk_contains, base_apk, find_aapt2, manifest_app_id
 
 APP_ID_RE = re.compile(r"ca-app-pub-\d+~\d+")
 AD_UNIT_ID_RE = re.compile(r"ca-app-pub-\d+/\d+")
@@ -41,6 +41,14 @@ APP_ID_UNVERIFIED_NOTE = (
 AD_ID_IN_APK_NOTE = (
     "Xác nhận từ APK: ID có trong build. Log chưa thấy load ID này -- "
     "chưa chứng minh placement đó đang bật hay màn đó dùng đúng ID."
+)
+VALUE_IN_APK_NOTE = (
+    "Xác nhận từ APK: giá trị này có trong build. Log không in nó ra -- "
+    "chưa chứng minh SDK đang dùng đúng giá trị đó lúc chạy."
+)
+VALUE_NOT_IN_APK_NOTE = (
+    "Không tìm thấy giá trị này trong APK của build đang cài -- nghi checklist "
+    "ghi giá trị không tồn tại trong build."
 )
 AD_ID_NOT_IN_APK_NOTE = (
     "Không tìm thấy ID này trong APK của build đang cài -- nghi checklist ghi ID "
@@ -60,6 +68,22 @@ def _row_ad_ids(row: dict) -> list[str]:
     ]
 
 
+def is_token_like(value: str) -> bool:
+    """Opaque enough that finding it in the APK means something.
+
+    Adjust tokens, Facebook ids and client tokens are unique strings: seeing one
+    inside the build is real evidence. A plain word is not -- "production" would
+    turn up in any APK ever built, and calling that a match would quietly pass a
+    row nobody checked. Requiring both letters and digits, or a long run of
+    digits, keeps the words out and the tokens in.
+    """
+    if len(value) < 6:
+        return False
+    has_alpha = any(c.isalpha() for c in value)
+    has_digit = any(c.isdigit() for c in value)
+    return (has_alpha and has_digit) or (value.isdigit() and len(value) >= 12)
+
+
 def verify_apk_rows(result: dict, package: str | None, apk_fn=base_apk) -> None:
     """Second-opinion unmatched App ID / ad unit ID rows against the APK, in place.
 
@@ -68,6 +92,7 @@ def verify_apk_rows(result: dict, package: str | None, apk_fn=base_apk) -> None:
     """
     app_id_rows = []
     ad_id_rows = []
+    plain_rows = []
     for section_rows in result["sections"].values():
         for row in section_rows:
             if row["found"]:
@@ -76,7 +101,12 @@ def verify_apk_rows(result: dict, package: str | None, apk_fn=base_apk) -> None:
                 app_id_rows.append(row)
             elif _row_ad_ids(row):
                 ad_id_rows.append(row)
-    if not (app_id_rows or ad_id_rows) or not package:
+            elif is_token_like(row["value"]):
+                # Tokens the log never prints -- an Adjust app token, a Facebook
+                # client token. They sat unverifiable while being compiled right
+                # into the build the whole time.
+                plain_rows.append(row)
+    if not (app_id_rows or ad_id_rows or plain_rows) or not package:
         return
 
     try:
@@ -91,6 +121,7 @@ def verify_apk_rows(result: dict, package: str | None, apk_fn=base_apk) -> None:
     try:
         _apply_app_id_rows(app_id_rows, apk_path)
         _apply_ad_id_rows(ad_id_rows, apk_path)
+        _apply_plain_rows(plain_rows, apk_path)
     finally:
         if ephemeral:
             os.unlink(apk_path)
@@ -129,3 +160,19 @@ def _apply_ad_id_rows(rows: list[dict], apk_path: str) -> None:
             row["note"] = AD_ID_IN_APK_NOTE
         else:
             row["note"] = AD_ID_NOT_IN_APK_NOTE
+
+
+def _apply_plain_rows(rows: list[dict], apk_path: str) -> None:
+    """Second-opinion plain-token rows against the APK, one sweep for all."""
+    if not rows:
+        return
+    try:
+        hits = apk_contains(apk_path, [row["value"] for row in rows])
+    except (zipfile.BadZipFile, OSError):
+        return
+    for row in rows:
+        if hits.get(row["value"]):
+            row["found"] = True
+            row["note"] = VALUE_IN_APK_NOTE
+        else:
+            row["note"] = VALUE_NOT_IN_APK_NOTE

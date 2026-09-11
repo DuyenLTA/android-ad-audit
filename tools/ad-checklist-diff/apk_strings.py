@@ -32,11 +32,15 @@ def resolve_apk(package: str) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("package", help="package name, hoặc bỏ qua nếu dùng --apk")
-    parser.add_argument("needles", nargs="+", help="các chuỗi cần tìm")
+    # `package` là positional, nên khi có --apk nó sẽ nuốt mất chuỗi đầu tiên và
+    # im lặng bỏ qua -- đúng loại lỗi sinh ra kết luận "không có trong build" sai.
     parser.add_argument("--apk", help="đọc file APK này thay vì lấy từ máy")
+    parser.add_argument("--package", help="lấy APK của package này từ máy")
+    parser.add_argument("needles", nargs="+", help="các chuỗi cần tìm")
     args = parser.parse_args()
 
+    if not args.apk and not args.package:
+        raise SystemExit("Cần --package <tên package> hoặc --apk <đường dẫn>")
     apk_path = args.apk or resolve_apk(args.package)
     print(f"APK: {apk_path}")
     hits = apk_contains(apk_path, args.needles)

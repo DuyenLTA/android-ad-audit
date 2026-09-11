@@ -40,3 +40,21 @@ def test_verify_package_rows_leaves_status_alone_when_adb_query_fails():
 
     verify_package_rows(result, installed_packages_fn=failing_lookup)
     assert result["sections"]["S"][0]["found"] is False
+
+
+def test_log_tags_match_case_sensitively(tmp_path):
+    # A capture that never enabled the tester dump still carried one unrelated
+    # `config_for_tester:` line -- lowercase, and enough to make the "filter
+    # matched nothing" warning stay silent while five correct rows read as
+    # mismatched.
+    from log_extractor import load_trusted_lines
+
+    log = tmp_path / "c.log"
+    log.write_text(
+        "I config_for_tester: Firebase token: abc\n"
+        "D AdSdkAdjust: Event success data: {\"app_token\":\"uz6fb8kyeww0\"}\n",
+        encoding="utf-8",
+    )
+    by = load_trusted_lines(str(log), ["FOR_TESTER", "AdSdkAdjust"])
+    assert by["FOR_TESTER"] == []
+    assert len(by["AdSdkAdjust"]) == 1
