@@ -212,6 +212,12 @@ def print_summary(result: dict, empty_filters: list[str]) -> None:
 #     bare `D TAG` line that matches nothing above, so the normal half of the
 #     pair never reached the capture's value set: an ad unit the build really
 #     loads went unlisted in leftover_ids and looked like it was never seen.
+#   setupAdjust -- the Adjust environment is printed once under an `Application`
+#     tag that matches nothing above, so the row read as Lệch on builds that
+#     were in fact correct. Matching on the method name rather than the bare
+#     word "Adjust" is deliberate: filters are case-insensitive substrings, and
+#     "Adjust" also catches hundreds of unrelated `sensors-hal` lines whose
+#     trailing text would then be trusted as candidate config values.
 DEFAULT_FILTERS = [
     "FOR_TESTER",
     "VslTemplate4FirstOpenSDK",
@@ -220,6 +226,7 @@ DEFAULT_FILTERS = [
     "RemoteConfigRepository",
     "inter_ads",
     "loadInterstitialAd",
+    "setupAdjust",
 ]
 
 EXIT_OK = 0
