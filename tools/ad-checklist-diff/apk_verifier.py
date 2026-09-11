@@ -61,6 +61,14 @@ def is_app_id(value: str) -> bool:
     return bool(APP_ID_RE.fullmatch(value))
 
 
+def has_ad_id_candidate(row: dict) -> bool:
+    """Whether the APK sweep could speak to this row at all.
+
+    A placement row keeps its real ad unit ID in `alt_values`, not in `value`.
+    """
+    return bool(_row_ad_ids(row))
+
+
 def _row_ad_ids(row: dict) -> list[str]:
     """The row's ad-unit-ID candidates: its own value plus sheet column C alts."""
     return [

@@ -87,7 +87,11 @@ def audit_one(
         log_path=capture_log,
         package=package,
         apk_path=apk_path,
-        use_device=capture_log is not None,
+        # Kể cả lượt APK-only cũng cắm máy (versionCode đọc từ dumpsys, APK pull
+        # về qua adb), nên `pm list packages` luôn trả lời được. Trước đây cờ này
+        # tắt theo việc "có capture hay không", làm dòng Package name bị báo lệch
+        # ở mọi lượt APK-only dù app đang cài ngay trên máy.
+        use_device=True,
     )
 
     delta = diff_results(previous, result)

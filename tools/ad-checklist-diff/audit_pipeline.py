@@ -20,7 +20,33 @@ from check_ads import (
     fetch_checklist,
     load_trusted_lines,
 )
+from apk_verifier import has_ad_id_candidate, is_app_id, is_token_like
 from package_verifier import is_package_name, verify_package_rows
+
+NO_LOG_NOTE = (
+    "Lượt này không capture log nên dòng này chưa kiểm được -- "
+    "không phải bằng chứng lệch."
+)
+
+
+def _mark_rows_no_log_can_answer(result: dict) -> None:
+    """Say so when a row simply had no source to answer it this run.
+
+    An APK-only run cannot speak to a value that only ever appears in a log --
+    the Adjust environment is the plain word `production`, which is in every
+    APK ever built and so cannot be swept for. Leaving the log-diff's own note
+    there reads as "looked and found a mismatch", which is not what happened.
+    """
+    for rows in result["sections"].values():
+        for row in rows:
+            if row["found"] or is_package_name(row["value"]) or is_app_id(row["value"]):
+                continue
+            # Đã có nguồn trả lời rồi thì giữ nguyên kết luận của nguồn đó. Dòng
+            # placement mang ID thật ở alt_values, không ở value -- bỏ sót chỗ này
+            # là xoá mất đúng cái ghi chú "không tìm thấy ID trong APK".
+            if is_token_like(row["value"]) or has_ad_id_candidate(row):
+                continue
+            row["note"] = NO_LOG_NOTE
 
 
 def checklist_package(result: dict) -> str | None:
@@ -70,5 +96,8 @@ def run_audit(
         verify_apk_rows(result, package or "(apk)", apk_fn=lambda _pkg: (apk_path, False))
     elif use_device and package:
         verify_apk_rows(result, package)
+
+    if not log_path:
+        _mark_rows_no_log_can_answer(result)
 
     return result, empty_filters
