@@ -2,7 +2,7 @@ export const meta = {
   name: 'audit-fanout',
   description: 'One agent per app: judge the rows the audit could not settle, verify each claim, write a report',
   phases: [
-    { title: 'Audit', detail: 'chạy audit_runner.py để có triage mới' },
+    { title: 'Audit', detail: 'chạy audit_runner.py để có triage mới', effort: 'low' },
     { title: 'Judge', detail: 'một agent mỗi app, phán các dòng triage' },
     { title: 'Verify', detail: 'phản biện từng kết luận' },
   ],
@@ -112,8 +112,10 @@ const VERDICT_SCHEMA = {
 }
 
 const judge = (pkg) => agent(
-  `Đọc ${toolDir}/out/${pkg}-triage.json và ${toolDir}/snapshots/${pkg}.json
-(đường dẫn tính từ thư mục gốc của repo).
+  `Đọc ${toolDir}/out/${pkg}-triage.json trước -- nó có đủ dòng cần phán, kèm
+build_ad_ids, missed_home, empty_filters.
+${toolDir}/snapshots/${pkg}.json là file lớn: CHỈ mở khi thật sự cần đối chiếu
+dòng anh em (twin) hoặc danh sách leftover_ids, và khi mở thì chỉ đọc phần cần.
 
 Với MỖI dòng trong triage (chỉ những dòng này, không xét dòng đã Khớp), kết luận:
 - checklist-sai: ID trong sheet không tồn tại trong build, và log cho thấy build dùng ID khác
@@ -188,7 +190,9 @@ Trả về: command đã chạy, exit code, toàn bộ output nó in ra, và tr�
 mỗi app một dòng trong bản tóm tắt, kèm con số sau "chưa kết luận:" ở cuối dòng
 đó. Chép đúng số đã in, đừng tự đếm lại. Dòng nào không có đoạn "chưa kết luận:"
 thì BỎ app đó ra khỏi "apps", đừng đoán số 0 -- không biết thì để lớp sau xử.`,
-    { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA },
+    // Chạy đúng một lệnh rồi chép lại output -- không có gì để cân nhắc, nên
+    // không trả tiền cho việc cân nhắc.
+    { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA, effort: 'low' },
   )
   if (!audit || audit.exit_code === 1) {
     // exit 1 is the runner failing outright; exit 2 just means rows are still
