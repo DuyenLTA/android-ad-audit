@@ -1,0 +1,199 @@
+<title>Đối chiếu ads {{TITLE}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  :root {
+    --paper:#f5f7f7; --surface:#ffffff; --ink:#141a1c; --ink-soft:#4c5a5e; --ink-faint:#7d8b8f;
+    --rule:#d8e0e1; --rule-soft:#e7edee; --accent:#0e7490; --accent-ink:#0a5c74;
+    --miss:#ad2b22; --miss-bg:#fbeceb; --hit:#1f6b4c; --hit-bg:#e8f3ed;
+    --warn:#8a5a00; --warn-bg:#f9f0dd;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+    --serif:"IBM Plex Serif",Georgia,serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:#0e1416; --surface:#151d20; --ink:#e6edee; --ink-soft:#a3b3b7; --ink-faint:#71858a;
+      --rule:#2a373b; --rule-soft:#1e292c; --accent:#3fb6cf; --accent-ink:#7fd4e6;
+      --miss:#f08078; --miss-bg:#2c1917; --hit:#6cc79b; --hit-bg:#142620;
+      --warn:#d7a63f; --warn-bg:#2a2315;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#0e1416; --surface:#151d20; --ink:#e6edee; --ink-soft:#a3b3b7; --ink-faint:#71858a;
+    --rule:#2a373b; --rule-soft:#1e292c; --accent:#3fb6cf; --accent-ink:#7fd4e6;
+    --miss:#f08078; --miss-bg:#2c1917; --hit:#6cc79b; --hit-bg:#142620;
+    --warn:#d7a63f; --warn-bg:#2a2315;
+  }
+
+  body { background:var(--paper); color:var(--ink); font-family:var(--serif); font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:900px; margin-inline:auto; padding-inline:22px; padding-block:44px 88px; display:flex; flex-direction:column; gap:46px; }
+  h1,h2,h3 { font-family:var(--sans); font-weight:600; text-wrap:balance; margin:0; line-height:1.2; }
+  p { margin:0; }
+  a { color:var(--accent-ink); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .eyebrow { font-family:var(--mono); font-size:11.5px; font-weight:500; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-faint); }
+  .mono { font-family:var(--mono); font-size:13.5px; overflow-wrap:anywhere; }
+
+  /* masthead */
+  .masthead { display:flex; flex-direction:column; gap:13px; }
+  .masthead h1 { font-size:clamp(29px,5.6vw,42px); letter-spacing:-.015em; }
+  .pkg { font-family:var(--mono); font-size:13px; color:var(--ink-soft); overflow-wrap:anywhere; }
+  .runmeta { display:flex; flex-wrap:wrap; gap:6px 20px; font-family:var(--mono); font-size:12px; color:var(--ink-faint); border-top:1px solid var(--rule); padding-top:12px; }
+  .runmeta b { color:var(--ink-soft); font-weight:500; }
+
+  /* scoreboard */
+  .score { display:flex; flex-direction:column; gap:18px; }
+  .score-top { display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 30px; }
+  .bigfrac { font-family:var(--mono); font-weight:600; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:.92; }
+  .bigfrac .n { font-size:clamp(54px,13vw,86px); color:var(--hit); }
+  .bigfrac .d { font-size:clamp(26px,6vw,40px); color:var(--ink-faint); }
+  .score-lede { font-size:16px; color:var(--ink-soft); max-width:40ch; flex:1 1 260px; }
+  .score-lede b { color:var(--miss); font-family:var(--sans); font-weight:700; }
+  .statchips { display:flex; flex-wrap:wrap; gap:8px; }
+  .statchip { display:flex; align-items:baseline; gap:9px; padding:7px 12px; border:1px solid var(--rule); background:var(--surface); text-decoration:none; color:inherit; }
+  .statchip-name { font-family:var(--sans); font-size:14px; font-weight:600; }
+  .statchip-frac { font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums; }
+  .chip--ok .statchip-frac { color:var(--hit); }
+  .chip--miss { border-color:var(--miss); background:var(--miss-bg); }
+  .chip--miss .statchip-frac { color:var(--miss); font-weight:600; }
+
+  /* sections */
+  section { display:flex; flex-direction:column; gap:16px; }
+  section > h2 { font-size:13px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-ink); border-bottom:1px solid var(--rule); padding-bottom:8px; }
+  .prose { max-width:64ch; }
+
+  /* checklist tables */
+  .sec { border:1px solid var(--rule); background:var(--surface); }
+  .sec + .sec { border-top:none; }
+  .sec > summary { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 14px; padding:13px 16px; cursor:pointer; font-family:var(--sans); list-style:none; }
+  .sec > summary::-webkit-details-marker { display:none; }
+  .sec-name { font-weight:600; font-size:17px; }
+  .sec-frac { font-family:var(--mono); font-size:12.5px; font-variant-numeric:tabular-nums; }
+  .frac--ok { color:var(--hit); }
+  .frac--miss { color:var(--miss); font-weight:600; }
+  .sec[open] > summary { border-bottom:1px solid var(--rule); }
+  .tbl-scroll { overflow-x:auto; }
+  .sec table { border-collapse:collapse; width:100%; font-size:14px; }
+  .sec th { font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; text-align:left; padding:9px 16px; border-bottom:1px solid var(--rule-soft); white-space:nowrap; }
+  .sec td { padding:9px 16px; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
+  .sec tbody tr:last-child td { border-bottom:none; }
+  .c-label { font-family:var(--sans); font-weight:600; max-width:24ch; }
+  .twin { font-family:var(--serif); font-weight:400; font-style:italic; color:var(--ink-faint); font-size:13px; }
+  .c-val .val { font-family:var(--mono); font-size:12.5px; overflow-wrap:anywhere; display:block; }
+  .altid { font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); display:block; margin-top:2px; overflow-wrap:anywhere; }
+  .c-st { white-space:nowrap; }
+  .st { font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; padding:2px 7px; border:1px solid currentColor; }
+  .st--ok { color:var(--hit); background:var(--hit-bg); }
+  .st--miss { color:var(--miss); background:var(--miss-bg); }
+  .tr--miss td { background:var(--miss-bg); }
+  .tr--miss .c-label { box-shadow:inset 3px 0 0 var(--miss); }
+  .rownote { font-family:var(--serif); font-size:13px; color:var(--ink-soft); white-space:normal; max-width:44ch; margin-top:6px; }
+
+  /* verdict strip */
+  .verdict { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 16px; border-left:4px solid var(--miss); background:var(--miss-bg); padding:14px 18px; }
+  .verdict strong { font-family:var(--sans); font-size:19px; font-weight:700; color:var(--miss); }
+  .verdict span { font-size:15px; color:var(--ink-soft); }
+
+  /* two IDs */
+  .duel { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); border:1px solid var(--rule); }
+  .side { background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:12px; }
+  .side > .eyebrow { color:var(--ink-soft); }
+  .idblock { font-family:var(--mono); overflow-wrap:anywhere; }
+  .idblock .prefix { display:block; font-size:12px; color:var(--ink-faint); }
+  .idblock .tail { font-size:clamp(22px,5.2vw,30px); font-weight:600; letter-spacing:-.02em; }
+  .side--sheet .tail { color:var(--miss); text-decoration:line-through; text-decoration-thickness:2px; }
+  .side--build .tail { color:var(--hit); }
+  .counts { display:flex; flex-direction:column; gap:4px; font-family:var(--mono); font-size:12.5px; }
+  .counts div { display:flex; justify-content:space-between; gap:12px; border-top:1px dotted var(--rule); padding-top:4px; color:var(--ink-soft); }
+  .counts b { font-weight:600; font-variant-numeric:tabular-nums; color:var(--ink); }
+
+  /* dex table */
+  .dex { border:1px solid var(--rule); background:var(--surface); }
+  .dex-cap { font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); padding:10px 16px; border-bottom:1px solid var(--rule-soft); }
+  .dex-rows { font-family:var(--mono); font-size:13.5px; overflow-x:auto; }
+  .dex-rows > div { display:flex; align-items:center; gap:14px; padding:7px 16px; white-space:nowrap; }
+  .dex-rows > div + div { border-top:1px solid var(--rule-soft); }
+  .dex-rows .num { font-variant-numeric:tabular-nums; }
+  .dex-rows .mark { font-size:11px; letter-spacing:.06em; text-transform:uppercase; margin-left:auto; }
+  .row--found .mark { color:var(--hit); }
+  .row--gap { background:var(--miss-bg); border-block:1px dashed var(--miss); }
+  .row--gap .num, .row--gap .mark { color:var(--miss); }
+
+  /* log */
+  .log { border:1px solid var(--rule); background:var(--surface); overflow-x:auto; }
+  .log table { border-collapse:collapse; font-family:var(--mono); font-size:12.5px; width:100%; }
+  .log td { padding:8px 14px; vertical-align:top; white-space:pre; }
+  .log tr + tr td { border-top:1px solid var(--rule-soft); }
+  .log .ln { color:var(--ink-faint); text-align:right; font-variant-numeric:tabular-nums; user-select:none; border-right:1px solid var(--rule-soft); }
+  .log em { font-style:normal; color:var(--hit); font-weight:600; }
+  .log s { color:var(--miss); }
+  .log .why { display:block; white-space:normal; font-family:var(--serif); font-size:13.5px; color:var(--ink-soft); margin-top:5px; max-width:58ch; }
+
+  /* ruled list */
+  .ruled { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; }
+  .ruled > li { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; padding:14px 0; border-top:1px solid var(--rule-soft); }
+  .ruled > li:first-child { border-top:none; padding-top:2px; }
+  .ruled .claim { font-family:var(--sans); font-weight:600; font-size:17px; grid-column:2; }
+  .ruled .refute { grid-column:2; font-size:15px; color:var(--ink-soft); max-width:62ch; }
+  .ruled .refute code, .notes code { font-family:var(--mono); font-size:13px; color:var(--ink); overflow-wrap:anywhere; }
+  .chipx { grid-row:span 2; align-self:start; font-family:var(--mono); font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; padding:3px 8px; border:1px solid currentColor; white-space:nowrap; margin-top:3px; color:var(--miss); background:var(--miss-bg); }
+
+  .callout { border-left:4px solid var(--warn); background:var(--warn-bg); padding:16px 18px; display:flex; flex-direction:column; gap:8px; }
+  .callout .eyebrow { color:var(--warn); }
+  .callout p { max-width:62ch; font-size:15.5px; }
+  .callout q { font-style:italic; }
+
+  .notes { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; }
+  .notes li { padding-left:18px; position:relative; max-width:64ch; font-size:15.5px; color:var(--ink-soft); }
+  .notes li::before { content:"—"; position:absolute; left:0; color:var(--ink-faint); }
+  .tag { font-family:var(--mono); font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--miss); border:1px solid currentColor; padding:1px 6px; margin-left:6px; white-space:nowrap; }
+  .tag--mute { color:var(--ink-faint); }
+
+  .colophon { border-top:1px solid var(--rule); padding-top:16px; font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); display:flex; flex-direction:column; gap:4px; overflow-wrap:anywhere; }
+
+  @media (max-width:600px) { .duel { grid-template-columns:1fr; } }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Ad checklist diff + audit fan-out · wf_8f6c22cc-5a6</div>
+    <h1>Đối chiếu ads — {{TITLE}}</h1>
+    <div class="pkg">{{PKG}} · versionCode {{VC}}</div>
+    <div class="runmeta">
+      <span>audit <b>{{AUDITED_AT}}</b></span>
+      <span>fan-out: 2 agents · <b>0 lỗi</b></span>
+      <span>delta: <b>không đổi</b></span>
+    </div>
+  </header>
+
+  <div class="score">
+    <div class="score-top">
+      <div class="bigfrac"><span class="n">{{MATCHED}}</span><span class="d">/{{TOTAL}}</span></div>
+      <p class="score-lede">dòng checklist khớp build. <b>{{MISSED}} dòng lệch</b>, đã điều tra tới cùng ở dưới. Ngoài ra {{LEFTOVER_N}} ID xuất hiện trong build mà sheet không có.</p>
+    </div>
+    <div class="statchips">{{CHIPS}}</div>
+  </div>
+
+  <section>
+    <h2>Bảng đối chiếu</h2>
+    <div>{{TABLES}}</div>
+  </section>
+
+  {{FINDINGS}}
+
+  <section>
+    <h2>ID có trong build, không có trong sheet</h2>
+    <ul class="notes">{{LEFTOVER}}</ul>
+  </section>
+
+  {{NOTES}}
+
+  <footer class="colophon">
+    <span>Nguồn: snapshots/{{PKG}}.json · out/…-triage.json · out/…-capture.log · .cache/ad-checklist-diff/…-{{VC}}.apk</span>
+    <span>plans/reports/audit-fanout-260911-1614-photogenerator-inter-feature-high-id-mismatch-report.md</span>
+  </footer>
+
+</div>

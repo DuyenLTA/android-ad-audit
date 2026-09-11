@@ -265,3 +265,26 @@ ngay với thông báo, thay vì trả report rỗng trông như "không có l�
 Chạy `audit_runner.py` **trước**: workflow chỉ đọc `out/<package>-triage.json`,
 nó không tự audit. Triage sinh từ lượt APK-only có các dòng "chưa thấy trong
 log" không có thật -- cho agent ăn triage đó là nó phán trên dữ liệu rác.
+
+### 5. Báo cáo artifact
+
+`artifact_report_builder.py` dựng trang HTML để gửi cho người giữ checklist --
+khác `report_renderer.py` (trang cho người chạy tool): nó mở đầu bằng điểm số
+(bao nhiêu dòng khớp / lệch), rồi mới tới bảng từng section.
+
+```
+.venv/bin/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
+  --findings out/<package>-findings.html \
+  --notes    out/<package>-notes.html \
+  --highlight 2733004612
+```
+
+Phần sinh từ snapshot: điểm số, chip từng section, bảng đầy đủ mọi dòng, danh
+sách ID build dùng mà sheet không có. Phần `--findings` / `--notes` viết tay mỗi
+lượt, vì thứ fan-out chứng minh được mỗi lần một khác -- generate nó ra thì
+thành bịa. Không truyền cũng chạy, ra trang thuần cơ học.
+
+`--highlight` nhận đuôi ID: ID nào phần điều tra đã giải thích thì được trỏ
+ngược về đó trong danh sách leftover, phần còn lại để trống chứ không đoán.
+
+Tên app lấy từ `label` trong `apps.json`; không có entry thì dùng package.
