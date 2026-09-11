@@ -15,6 +15,7 @@ an agent's attention.
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -36,6 +37,7 @@ def audit_one(
     out_dir: Path,
     force: bool = False,
     capture_log: str | None = None,
+    missed_home: list[str] | None = None,
     snapshots_dir=None,
 ) -> dict:
     """Audit a single app; returns a summary dict (never raises for one app)."""
@@ -79,7 +81,20 @@ def audit_one(
     triage_path = out_dir / f"{package}-triage.json"
     triage_path.write_text(
         json.dumps(
-            {"delta": delta, "triage": triage(result), "empty_filters": empty_filters},
+            {
+                # Ai đọc triage về sau -- người hay agent -- không có cách nào
+                # biết lượt capture sinh ra nó đã đi tới đâu, nên bối cảnh phải
+                # nằm ngay trong file. `missed_home` là None khi lượt đó không
+                # capture gì cả, khác hẳn với [] nghĩa là mọi luồng đều tới nơi.
+                "package": package,
+                "version_code": version_code,
+                "audited_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "capture_log": capture_log,
+                "missed_home": missed_home,
+                "delta": delta,
+                "triage": triage(result),
+                "empty_filters": empty_filters,
+            },
             ensure_ascii=False,
             indent=2,
         ),
@@ -143,6 +158,8 @@ def capture_and_audit(
         tap_xy=tuple(splash_tap) if splash_tap else None,
     )
 
+    missed_home = [p["pass"] for p in passes if not p["reached_home"]]
+
     # Already decided to run above; `force` here only stops the second skip check.
     summary = audit_one(
         app,
@@ -150,10 +167,11 @@ def capture_and_audit(
         out_dir=out_dir,
         force=True,
         capture_log=str(log_path),
+        missed_home=missed_home,
         snapshots_dir=snapshots_dir,
     )
     summary["capture_log"] = str(log_path)
-    summary["missed_home"] = [p["pass"] for p in passes if not p["reached_home"]]
+    summary["missed_home"] = missed_home
     return summary
 
 

@@ -115,7 +115,23 @@ Cách kiểm chứng, dùng đúng các nguồn này, KHÔNG đoán:
 - Log của lượt capture gần nhất: ${toolDir}/out/${pkg}-capture.log -- tìm cặp
   key=<high_id>_<normal_id>: nửa kia của cặp đã khớp checklist thì nửa còn lại
   chính là ID build đang dùng cho dòng twin
-Mỗi finding phải kèm evidence trích dẫn được (tên file + chuỗi tìm thấy/không thấy).`,
+Mỗi finding phải kèm evidence trích dẫn được (tên file + chuỗi tìm thấy/không thấy).
+
+TRƯỚC KHI PHÁN, đọc phần đầu triage để biết lượt capture sinh ra nó đi tới đâu.
+Nó quyết định kết luận nào còn đứng được:
+- missed_home không rỗng: các luồng đó chưa tới Home, nên dòng nào phụ thuộc màn
+  sau Home thì phải là chua-capture-du, KHÔNG được kết luận checklist-sai hay
+  build-thieu chỉ vì log im lặng.
+- missed_home là null: lượt đó không capture gì cả (chỉ đọc APK), nên MỌI kết
+  luận dựa trên "log không có" đều vô giá trị. Log trên đĩa là của lượt trước,
+  có thể khác build.
+- empty_filters không rỗng: cả vùng đó không có dòng log nào, xử như trên.
+- version_code trong triage khác version_code trong snapshot, hoặc audited_at đã
+  cũ: nói rõ trong evidence rằng đang phán trên ảnh chụp cũ.
+- triage không có các trường trên: file sinh từ bản tool cũ, chưa ghi bối cảnh.
+  Xử như không biết gì về lượt capture, và nói rõ điều đó trong evidence.
+Vắng mặt trong log KHÔNG BAO GIỜ tự nó là bằng chứng, chỉ vắng mặt trong APK mới
+là bằng chứng. Thiếu bối cảnh thì trả khong-ket-luan-duoc, đừng đoán bù.`,
   { label: `judge:${pkg}`, phase: 'Judge', schema: FINDINGS_SCHEMA },
 )
 

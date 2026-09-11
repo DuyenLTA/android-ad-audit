@@ -207,6 +207,13 @@ cùng kết quả. `--force` để chạy lại bất chấp. Mỗi app sinh:
 - `out/<package>-triage.json` -- delta (dòng mới lệch / đã fix / ID lạ mới) và
   các dòng tool không tự kết luận được, chia theo loại
 
+Triage mang theo bối cảnh của chính lượt sinh ra nó: `version_code`,
+`audited_at`, `capture_log`, `empty_filters`, và `missed_home` -- các luồng chưa
+tới được Home. `missed_home: null` nghĩa là lượt đó không capture gì cả, khác
+hẳn `[]` là mọi luồng đều tới nơi. Không có mấy trường này thì ai đọc triage về
+sau -- người hay agent -- không có cách nào biết log mình đang tin là log của
+một lượt đi lạc.
+
 Phần audit từ APK không đụng device nên chạy song song giữa các app; phần
 capture cần máy thì phải tuần tự vì chỉ có một máy:
 

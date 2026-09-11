@@ -118,6 +118,43 @@ def test_journey_that_never_reached_home_is_flagged(tmp_path, monkeypatch):
     assert out["missed_home"] == ["old"]
 
 
+def test_triage_carries_the_journey_that_stopped_short(tmp_path, monkeypatch):
+    # Printing it to the terminal loses it: whoever reads the triage later has
+    # no other way to learn the capture never got past onboarding.
+    _stub(monkeypatch)
+    _stub_capture(monkeypatch, reached=("new",), missed=("old",))
+    out = capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    payload = json.loads(open(out["triage_path"], encoding="utf-8").read())
+    assert payload["missed_home"] == ["old"]
+    assert payload["capture_log"].endswith("-capture.log")
+
+
+def test_triage_of_a_full_journey_says_nothing_was_missed(tmp_path, monkeypatch):
+    _stub(monkeypatch)
+    _stub_capture(monkeypatch)
+    out = capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    payload = json.loads(open(out["triage_path"], encoding="utf-8").read())
+    assert payload["missed_home"] == []
+
+
+def test_apk_only_triage_leaves_missed_home_null_not_empty(tmp_path, monkeypatch):
+    # [] would read as "every journey reached Home"; there was no journey at all.
+    _stub(monkeypatch)
+    out = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    payload = json.loads(open(out["triage_path"], encoding="utf-8").read())
+    assert payload["missed_home"] is None
+    assert payload["capture_log"] is None
+
+
+def test_triage_names_the_build_and_the_moment_it_was_audited(tmp_path, monkeypatch):
+    _stub(monkeypatch, version="41")
+    out = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    payload = json.loads(open(out["triage_path"], encoding="utf-8").read())
+    assert payload["package"] == APPS[0]["package"]
+    assert payload["version_code"] == "41"
+    assert payload["audited_at"].startswith("20")
+
+
 def test_capture_lane_runs_one_app_at_a_time(tmp_path, monkeypatch):
     # One phone: two captures overlapping would interleave two apps' logs.
     _stub(monkeypatch)
