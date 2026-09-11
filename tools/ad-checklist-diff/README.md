@@ -205,6 +205,17 @@ nó trong sheet đó:
 python audit_runner.py
 ```
 
+`label` chỉ là nickname nội bộ. Tìm app theo tên hiện trên màn hình điện thoại:
+
+```
+python find_app.py Nexus
+→ ai.photogenerator.aivideo.aivideogenerator.aiart  (Nexus AI - AI Video Generator)
+```
+
+Khớp cả tên launcher (đọc từ APK đã cache), `label`, `aliases` khai thêm trong
+registry, lẫn package. Exit 0 = đúng một app, 1 = không khớp (in ra danh sách
+có sẵn), 2 = nhiều app khớp, để người chọn chứ không đoán.
+
 `--sheet` chỉ cần khi muốn chạy với sheet khác cái registry khai. Dạng cũ (file
 là list các app, không có `"sheet"`) vẫn đọc được, nhưng lúc đó `--sheet` là bắt
 buộc.

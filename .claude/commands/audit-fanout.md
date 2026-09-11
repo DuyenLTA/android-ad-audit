@@ -22,13 +22,26 @@ gọi — đường dẫn tương đối là cách chắc chắn nhất để n�
 
 ## 1. Đọc registry
 
-Đọc `<repo>/tools/ad-checklist-diff/apps.json`. Mỗi entry có `label`,
-`package`, `gid`.
+Không nêu tên app trong `$ARGUMENTS` thì lấy hết registry:
+`<repo>/tools/ad-checklist-diff/apps.json`.
 
-Nếu `$ARGUMENTS` có nêu tên app hoặc package thì chỉ lấy app đó (khớp `label`
-không phân biệt hoa thường, hoặc khớp `package`); không nêu thì lấy hết.
-Không tìm ra app nào khớp thì dừng và liệt kê các app có trong registry — đừng
-đoán, và đừng chạy hết cả registry thay thế.
+Có nêu tên thì **đừng tự so chuỗi** — chạy:
+
+```
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py "<tên>"
+```
+
+Nó khớp cả tên trên màn hình điện thoại (đọc từ APK đã cache), `label` trong
+registry, `aliases`, lẫn package. Người ta gõ cái họ nhìn thấy trên máy —
+"Nexus" — chứ không gõ nickname nội bộ "AI Art".
+
+Theo exit code:
+
+- `0` — đúng một app, chạy nó
+- `1` — không khớp. **Dừng**, in nguyên danh sách nó gợi ý. Đừng đoán, và tuyệt
+  đối đừng chạy cả registry thay thế: lượt capture mặc định `pm clear` app, chạy
+  nhầm app là xoá dữ liệu của app không liên quan
+- `2` — nhiều app khớp. **Dừng**, liệt kê ra và hỏi người dùng chọn
 
 ## 2. Gọi workflow
 
