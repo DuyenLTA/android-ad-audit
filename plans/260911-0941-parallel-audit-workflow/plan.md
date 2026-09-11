@@ -27,7 +27,7 @@ nhiều app song song và lặp định kỳ.
 |---|-------|-----------|
 | 01 | [Headless audit engine](phase-01-headless-audit-engine.md) — CLI `--json/--apk/--package`, log optional, exit code, registry | **Xong** |
 | 02 | [Device driver automation](phase-02-device-driver-automation.md) — tự mở app, spam logo, qua onboarding, 2 luồng user | **Xong** |
-| 03 | Agent fan-out (`workflows/audit-fanout.mjs`): 1 agent/app phán dòng ambiguous, có lượt phản biện | **Xong** |
+| 03 | Agent fan-out (`.claude/workflows/audit-fanout.mjs`): 1 agent/app phán dòng ambiguous, có lượt phản biện | **Xong** |
 | 04 | Lặp định kỳ: `audit_runner.py` bỏ qua build chưa đổi, diff snapshot, xuất delta + triage | **Xong** |
 | 05 | Lane device trong runner (`--capture`) + cron hàng ngày (`scheduled-audit.sh`) | **Xong** |
 
@@ -125,6 +125,17 @@ nhiều app song song và lặp định kỳ.
   phải dump lại. Có test chặn.
 - Hệ quả cũ: score không sai (extract theo set), nhưng log to gấp đôi, số dòng
   trỏ vào hai chỗ cùng lúc, và không đọc riêng được từng luồng user.
+
+## Gọn hoá cách chạy
+- Workflow chuyển vào `.claude/workflows/audit-fanout.mjs` để gọi được bằng tên.
+  Đo được: script workflow **không đọc được file** (`import()` bị chặn trong
+  sandbox), nên `apps` phải do phiên gọi đọc `apps.json` rồi truyền vào; không
+  truyền thì workflow dừng ngay thay vì trả report rỗng trông như "không lỗi".
+  Chưa verify được tra-theo-tên vì không tự restart phiên được; gọi bằng
+  `scriptPath` thì đã verify chạy.
+- Workflow **không cần URL sheet**: checklist đã nằm sẵn trong snapshot
+  (`result.sections`, đủ 76 dòng label+value). Sheet là input của
+  `audit_runner.py` ở bước trước.
 
 ## Việc còn lại
 - Sửa sheet theo 4 finding đã giữ: quyết định của người làm checklist, không

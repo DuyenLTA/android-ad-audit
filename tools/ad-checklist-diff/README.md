@@ -236,7 +236,22 @@ Env đổi được: `AD_AUDIT_PYTHON`, `AD_AUDIT_LOG`, `AD_AUDIT_LOG_LINES`,
 
 ### 4. Lớp agent (tuỳ chọn)
 
-`workflows/audit-fanout.mjs` -- một agent mỗi app, chỉ đọc các dòng trong
-triage, kết luận (checklist sai / build thiếu / chưa capture đủ) rồi một lượt
-phản biện từng kết luận. Phần diff vẫn là Python: agent không làm lại việc mà
-`grep` đã làm đúng.
+`.claude/workflows/audit-fanout.mjs` -- một agent mỗi app, chỉ đọc các dòng
+trong triage, kết luận (checklist sai / build thiếu / chưa capture đủ) rồi một
+lượt phản biện từng kết luận. Phần diff vẫn là Python: agent không làm lại việc
+mà `grep` đã làm đúng.
+
+Chạy trong Claude Code, mở phiên **tại thư mục gốc repo** rồi gõ:
+
+```
+chạy workflow audit-fanout cho các app trong registry
+```
+
+Phải nói rõ chữ "workflow" -- đây là lớp multi-agent, tốn token, nên nó không tự
+kích hoạt. Script không đọc được file (sandbox, không có filesystem), nên phiên
+gọi phải đọc `apps.json` và truyền `args.apps`; không truyền thì workflow dừng
+ngay với thông báo, thay vì trả report rỗng trông như "không có lỗi nào".
+
+Chạy `audit_runner.py` **trước**: workflow chỉ đọc `out/<package>-triage.json`,
+nó không tự audit. Triage sinh từ lượt APK-only có các dòng "chưa thấy trong
+log" không có thật -- cho agent ăn triage đó là nó phán trên dữ liệu rác.

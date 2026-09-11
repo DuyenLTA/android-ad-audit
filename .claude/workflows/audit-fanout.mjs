@@ -1,5 +1,5 @@
 export const meta = {
-  name: 'ad-checklist-audit-fanout',
+  name: 'audit-fanout',
   description: 'One agent per app: judge the rows the audit could not settle, verify each claim, write a report',
   phases: [{ title: 'Judge' }, { title: 'Verify' }],
 }
@@ -11,11 +11,26 @@ export const meta = {
 //   - "chưa thấy trong log": nothing in the capture speaks to this row
 // Everything else is already Khớp/Lệch with evidence and needs no judgement.
 //
-// Run it with the triage files as args, e.g.
-//   args: { toolDir: '/abs/path/tools/ad-checklist-diff', apps: ['com.example.app'] }
+// Lives in .claude/workflows/ so it can be run by name: `chạy workflow
+// audit-fanout` from a session opened at the repo root.
+//
+// `apps` has to be passed in -- a workflow script cannot read apps.json itself
+// (no filesystem in here), so the calling session reads the registry and hands
+// the packages over:
+//   args: { apps: ['com.example.app'] }
+// `toolDir` only needs passing when the tool is not where it normally sits.
 
-const toolDir = args?.toolDir ?? '.'
+const toolDir = args?.toolDir ?? 'tools/ad-checklist-diff'
 const apps = args?.apps ?? []
+
+if (apps.length === 0) {
+  // Without this the pipeline quietly runs over nothing and returns an empty
+  // report, which reads like "no findings" rather than "you gave me no apps".
+  throw new Error(
+    'Chưa có app nào: truyền args.apps, ví dụ { apps: ["com.example.app"] }. ' +
+    'Danh sách package nằm ở ' + toolDir + '/apps.json.',
+  )
+}
 
 const FINDINGS_SCHEMA = {
   type: 'object',
@@ -51,7 +66,8 @@ const VERDICT_SCHEMA = {
 }
 
 const judge = (pkg) => agent(
-  `Đọc ${toolDir}/out/${pkg}-triage.json và ${toolDir}/snapshots/${pkg}.json.
+  `Đọc ${toolDir}/out/${pkg}-triage.json và ${toolDir}/snapshots/${pkg}.json
+(đường dẫn tính từ thư mục gốc của repo).
 
 Với MỖI dòng trong triage (chỉ những dòng này, không xét dòng đã Khớp), kết luận:
 - checklist-sai: ID trong sheet không tồn tại trong build, và log cho thấy build dùng ID khác
@@ -60,7 +76,7 @@ Với MỖI dòng trong triage (chỉ những dòng này, không xét dòng đã
 - khong-ket-luan-duoc: không đủ bằng chứng
 
 Cách kiểm chứng, dùng đúng các nguồn này, KHÔNG đoán:
-- APK đang cache: ${toolDir}/../../../.cache/ad-checklist-diff/${pkg}-*.apk
+- APK đang cache: ~/.cache/ad-checklist-diff/${pkg}-*.apk
   (tìm chuỗi bằng python zipfile, quét entry .dex/.arsc)
 - Nếu tên placement không xuất hiện trong dex thì đó là build-thieu, không phải sai ID
 - Log của lượt capture gần nhất: ${toolDir}/out/${pkg}-capture.log -- tìm cặp
