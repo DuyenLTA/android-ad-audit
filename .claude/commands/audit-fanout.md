@@ -63,8 +63,15 @@ Với mỗi app vừa chạy:
    cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
      --findings out/<package>-findings.html \
      --notes    out/<package>-notes.html \
-     --highlight <đuôi ID mà phần điều tra có giải thích>
+     --highlight <đuôi ID mà phần điều tra có giải thích> \
+     --run <run ID workflow vừa trả về> \
+     --mode <capture|apk|skip — đúng chế độ vừa chạy> \
+     --report plans/reports/<báo cáo bước 4>.md
    ```
+
+   `--run`, `--mode`, `--report` bắt buộc truyền — không có chỗ nào trên đĩa ghi
+   lại ba thứ đó. Đừng gõ tay chúng vào template: template dùng chung cho mọi
+   app, mọi lượt. `delta` và cảnh báo capture thì builder tự đọc từ triage.
 
    Builder mặc định đọc `snapshots/` và ghi `out/` cạnh chính nó, nên đường dẫn
    trong lệnh trên tính từ `<repo>`.
