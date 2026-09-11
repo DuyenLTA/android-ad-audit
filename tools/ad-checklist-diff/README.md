@@ -257,6 +257,17 @@ mà `grep` đã làm đúng.
 Chạy trong Claude Code, mở phiên **tại thư mục gốc repo** rồi gõ:
 
 ```
+/audit-fanout                 # hết registry, có capture lại
+/audit-fanout AI Art          # một app, khớp theo label hoặc package
+/audit-fanout --skip          # phán luôn trên triage có sẵn
+/audit-fanout --apk --force   # đọc APK, không lái UI, chạy lại cả bản đã audit
+```
+
+`.claude/commands/audit-fanout.md` lo phần đọc registry, gọi workflow, dựng báo
+cáo artifact rồi commit. Không có slash command thì nói bằng lời cũng được,
+miễn có chữ "workflow":
+
+```
 chạy workflow audit-fanout cho các app trong registry
 ```
 
