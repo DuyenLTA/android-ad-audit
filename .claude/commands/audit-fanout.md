@@ -54,7 +54,7 @@ Với mỗi app vừa chạy:
 
 1. Viết mảnh HTML phần điều tra vào `<repo>/tools/ad-checklist-diff/out/<package>-findings.html`
    và phần ghi chú + câu hỏi chưa giải quyết vào `…/out/<package>-notes.html`,
-   dựa trên `confirmed` / `disputed` mà workflow trả về. Chỉ viết những gì agent
+   dựa trên `confirmed` / `disputed` / `unresolved` mà workflow trả về. Chỉ viết những gì agent
    thật sự chứng minh được, kèm trích dẫn nguồn (tên file + chuỗi tìm thấy hoặc
    không thấy). Không có finding nào thì bỏ qua hai file này.
 2. Dựng trang:
@@ -84,7 +84,16 @@ push). `snapshots/` và `out/` nằm trong `.gitignore` — không cố thêm ch
 
 ## Báo lại
 
-Nói rõ: bao nhiêu dòng khớp / lệch mỗi app, dòng nào `disputed` (cần người xem
-lại), link artifact. Bằng chứng chỉ chứng minh sheet và bản cài lệch nhau —
+Nói rõ: bao nhiêu dòng khớp / lệch mỗi app, link artifact, và ba nhóm kết quả:
+
+- `confirmed` -- có luận điểm, đã qua phản biện, luận điểm đứng
+- `disputed` -- có luận điểm, phản biện làm nó đổ. **Cần người xem lại.**
+- `unresolved` -- agent tự nhận không đủ bằng chứng, chưa từng qua phản biện
+  (không có gì để phản biện). Cũng cần người xem, nhưng vì lý do khác hẳn.
+
+App nào nằm trong `clean` thì không còn dòng nào chưa kết luận -- nói thẳng là
+sạch, đừng im lặng bỏ qua khiến người đọc tưởng nó bị lỗi.
+
+Bằng chứng chỉ chứng minh sheet và bản cài lệch nhau —
 không tự nó nói bên nào sai, nên phát biểu theo hướng "cần ads-team xác nhận"
 thay vì khẳng định checklist sai.

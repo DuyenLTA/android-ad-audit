@@ -30,6 +30,18 @@ from device_flow import DEFAULT_HOME_MATCH
 DEFAULT_OUT_DIR = Path(__file__).parent / "out"
 
 
+def unsettled_rows(triage_path: Path) -> int | None:
+    """How many rows the tool could not settle by itself.
+
+    None means there is no triage yet -- which is not the same as zero, and the
+    agent layer has to tell the two apart before deciding it has nothing to do.
+    """
+    if not triage_path.exists():
+        return None
+    payload = json.loads(triage_path.read_text(encoding="utf-8"))
+    return sum(len(rows) for rows in payload.get("triage", {}).values())
+
+
 def audit_one(
     app: dict,
     base_sheet: str,
@@ -54,7 +66,13 @@ def audit_one(
         and version_code
         and previous.get("version_code") == version_code
     ):
-        return {"package": package, "label": label, "skipped": "build chưa đổi", "version_code": version_code}
+        return {
+            "package": package,
+            "label": label,
+            "skipped": "build chưa đổi",
+            "version_code": version_code,
+            "unsettled": unsettled_rows(out_dir / f"{package}-triage.json"),
+        }
 
     apk_path = None
     if not capture_log:
@@ -78,6 +96,7 @@ def audit_one(
     # Distinct from the snapshot's own `<package>.json`: pointing both at one
     # directory would otherwise have the triage overwrite the baseline, and the
     # next run would see no history at all.
+    triage_rows = triage(result)
     triage_path = out_dir / f"{package}-triage.json"
     triage_path.write_text(
         json.dumps(
@@ -92,7 +111,7 @@ def audit_one(
                 "capture_log": capture_log,
                 "missed_home": missed_home,
                 "delta": delta,
-                "triage": triage(result),
+                "triage": triage_rows,
                 "empty_filters": empty_filters,
             },
             ensure_ascii=False,
@@ -111,6 +130,7 @@ def audit_one(
         "missing": total - matched,
         "delta": delta,
         "triage_path": str(triage_path),
+        "unsettled": sum(len(rows) for rows in triage_rows.values()),
     }
 
 
@@ -215,13 +235,27 @@ def run_all(
         return list(pool.map(work, apps))
 
 
+def _unsettled_note(result: dict) -> str:
+    """The one thing the agent layer needs from the summary, in a fixed shape.
+
+    Printed for every app, skipped ones included: a skip leaves the previous
+    triage standing, and whether that triage still holds rows is exactly what
+    decides if an agent has any work here.
+    """
+    count = result.get("unsettled")
+    return "" if count is None else f" | chưa kết luận: {count}"
+
+
 def print_summary(results: list[dict]) -> None:
     for r in results:
         name = r.get("label") or r["package"]
         if r.get("error"):
             print(f"  [lỗi]  {name}: {r['error']}")
         elif r.get("skipped"):
-            print(f"  [bỏ]   {name}: {r['skipped']} (versionCode {r.get('version_code')})")
+            print(
+                f"  [bỏ]   {name}: {r['skipped']} "
+                f"(versionCode {r.get('version_code')}){_unsettled_note(r)}"
+            )
         else:
             delta = r["delta"]
             flags = []
@@ -232,7 +266,7 @@ def print_summary(results: list[dict]) -> None:
             if delta["new_leftover_ids"]:
                 flags.append(f"{len(delta['new_leftover_ids'])} ID lạ mới")
             state = ", ".join(flags) if flags else "không đổi"
-            print(f"  [{r['score']}] {name}: {state}")
+            print(f"  [{r['score']}] {name}: {state}{_unsettled_note(r)}")
             if r.get("missed_home"):
                 # A journey that never reached Home captured less than it should
                 # have, so its "chưa thấy trong log" rows are not evidence of a bug.

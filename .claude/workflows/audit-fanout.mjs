@@ -61,6 +61,19 @@ const AUDIT_SCHEMA = {
     command: { type: 'string' },
     exit_code: { type: 'number' },
     output: { type: 'string' },
+    // Bản tóm tắt đã in sẵn con số này cho từng app; đọc lại ở đây rẻ hơn nhiều
+    // so với việc mở một agent chỉ để biết app đó có việc gì cho agent không.
+    apps: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          package: { type: 'string' },
+          unsettled: { type: 'number' },
+        },
+        required: ['package', 'unsettled'],
+      },
+    },
   },
   required: ['command', 'exit_code', 'output'],
 }
@@ -144,6 +157,10 @@ có cách giải thích khác hợp lý hơn. Đừng xác nhận chỉ vì nghe
   { label: `verify:${pkg}:${f.value}`, phase: 'Verify', schema: VERDICT_SCHEMA },
 )
 
+// Đọc được thì dùng để bỏ bớt agent ở dưới; không đọc được thì để rỗng, và mọi
+// app đều được phán -- thiếu thông tin phải nghiêng về làm thừa, không phải bỏ sót.
+let unsettled = {}
+
 if (auditMode !== 'skip') {
   phase('Audit')
   const flags = (auditMode === 'capture' ? ' --capture' : '') + (force ? ' --force' : '')
@@ -158,7 +175,11 @@ Nó có thể lái máy thật và mất vài phút -- chờ cho xong, đừng b
 chạy lại. Báo "build chưa đổi" là ĐÚNG, không phải lỗi: triage cũ vẫn dùng được
 vì cùng build thì cùng kết quả.
 Nếu lệnh lỗi thì BÁO LẠI nguyên văn, KHÔNG tự sửa lệnh và chạy lại.
-Trả về: command đã chạy, exit code, và toàn bộ output nó in ra.`,
+
+Trả về: command đã chạy, exit code, toàn bộ output nó in ra, và trường "apps" --
+mỗi app một dòng trong bản tóm tắt, kèm con số sau "chưa kết luận:" ở cuối dòng
+đó. Chép đúng số đã in, đừng tự đếm lại. Dòng nào không có đoạn "chưa kết luận:"
+thì BỎ app đó ra khỏi "apps", đừng đoán số 0 -- không biết thì để lớp sau xử.`,
     { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA },
   )
   if (!audit || audit.exit_code === 1) {
@@ -169,20 +190,49 @@ Trả về: command đã chạy, exit code, và toàn bộ output nó in ra.`,
       (audit ? audit.output : '(agent không trả về gì)'),
     )
   }
+  unsettled = Object.fromEntries(
+    (audit.apps ?? []).map((a) => [a.package, a.unsettled]),
+  )
   log(`Audit xong (exit ${audit.exit_code}). Sang phần phán các dòng chưa kết luận được.`)
 }
 
+// App không còn dòng nào chưa kết luận thì không có gì để phán. `undefined`
+// nghĩa là audit không khai được con số -- lúc đó vẫn phán, vì bỏ sót một dòng
+// lệch tốn kém hơn nhiều so với một agent chạy không.
+const idle = apps.filter((pkg) => unsettled[pkg] === 0)
+const toJudge = apps.filter((pkg) => unsettled[pkg] !== 0)
+
+if (idle.length) {
+  log(`Sạch, không cần phán: ${idle.join(', ')}`)
+}
+if (toJudge.length === 0) {
+  log('Mọi app đều sạch -- không mở agent nào ở Judge/Verify.')
+  return { confirmed: [], disputed: [], unresolved: [], clean: idle }
+}
+
+// "Không kết luận được" không có luận điểm nào để phản biện, nên nó đi thẳng ra
+// ngoài thay vì tốn một agent chỉ để nghe lại đúng câu đó.
+const arguable = (f) => f.verdict !== 'khong-ket-luan-duoc'
+
 const results = await pipeline(
-  apps,
+  toJudge,
   (pkg) => judge(pkg).then((r) => ({ pkg, findings: r.findings ?? [] })),
   ({ pkg, findings }) =>
     parallel(
-      findings.map((f) => () => verify(pkg, f).then((v) => ({ pkg, ...f, verify: v }))),
+      findings.map((f) => () =>
+        arguable(f)
+          ? verify(pkg, f).then((v) => ({ pkg, ...f, verify: v }))
+          : Promise.resolve({ pkg, ...f, verify: null }),
+      ),
     ),
 )
 
 const all = results.flat().filter(Boolean)
 return {
   confirmed: all.filter((f) => f.verify?.holds),
-  disputed: all.filter((f) => !f.verify?.holds),
+  disputed: all.filter((f) => f.verify && !f.verify.holds),
+  // Chưa từng qua phản biện: agent tự nhận không đủ bằng chứng. Cần người xem,
+  // nhưng khác hẳn disputed -- disputed là có luận điểm và luận điểm đó đổ.
+  unresolved: all.filter((f) => !f.verify),
+  clean: idle,
 }

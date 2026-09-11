@@ -1,7 +1,7 @@
 import json
 
 import audit_runner
-from audit_runner import audit_one, capture_and_audit, run_all
+from audit_runner import audit_one, capture_and_audit, print_summary, run_all, unsettled_rows
 
 APPS = [{"package": "com.a", "gid": "1", "label": "A"}, {"package": "com.b", "gid": "2"}]
 SHEET = "https://docs.google.com/spreadsheets/d/ABC/edit"
@@ -179,3 +179,42 @@ def test_run_all_writes_snapshots_where_told(tmp_path, monkeypatch):
     _stub(monkeypatch)
     run_all(APPS, SHEET, out_dir=tmp_path, force=True, snapshots_dir=tmp_path)
     assert {p.name for p in tmp_path.glob("com.*.json")} >= {"com.a.json", "com.b.json"}
+
+
+def test_unsettled_rows_tells_no_triage_apart_from_an_empty_one(tmp_path):
+    # None means "never audited"; 0 means "audited, nothing left to judge".
+    assert unsettled_rows(tmp_path / "nope.json") is None
+    empty = tmp_path / "empty.json"
+    empty.write_text('{"triage": {"a": [], "b": []}}', encoding="utf-8")
+    assert unsettled_rows(empty) == 0
+    some = tmp_path / "some.json"
+    some.write_text('{"triage": {"a": [1, 2], "b": [3]}}', encoding="utf-8")
+    assert unsettled_rows(some) == 3
+
+
+def test_audit_reports_how_many_rows_are_left_for_the_agents(tmp_path, monkeypatch):
+    _stub(monkeypatch)
+    out = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    payload = json.loads(open(out["triage_path"], encoding="utf-8").read())
+    assert out["unsettled"] == sum(len(rows) for rows in payload["triage"].values())
+
+
+def test_skipped_app_still_reports_the_standing_triage(tmp_path, monkeypatch):
+    # A skip leaves the previous triage in place, so its rows are still work.
+    _stub(monkeypatch)
+    audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    again = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert again["skipped"]
+    assert again["unsettled"] is not None
+
+
+def test_summary_prints_the_count_the_agent_layer_reads(capsys):
+    print_summary([
+        {"package": "com.a", "label": "A", "score": "9/9", "unsettled": 0,
+         "delta": {"broke": [], "fixed": [], "new_leftover_ids": []}},
+        {"package": "com.b", "label": "B", "skipped": "build chưa đổi",
+         "version_code": "7", "unsettled": 2},
+    ])
+    printed = capsys.readouterr().out
+    assert "chưa kết luận: 0" in printed
+    assert "chưa kết luận: 2" in printed
