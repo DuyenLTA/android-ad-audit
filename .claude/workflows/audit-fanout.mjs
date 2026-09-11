@@ -1,7 +1,11 @@
 export const meta = {
   name: 'audit-fanout',
   description: 'One agent per app: judge the rows the audit could not settle, verify each claim, write a report',
-  phases: [{ title: 'Judge' }, { title: 'Verify' }],
+  phases: [
+    { title: 'Audit', detail: 'chạy audit_runner.py để có triage mới' },
+    { title: 'Judge', detail: 'một agent mỗi app, phán các dòng triage' },
+    { title: 'Verify', detail: 'phản biện từng kết luận' },
+  ],
 }
 
 // Consumes what `audit_runner.py` already decided mechanically. The deterministic
@@ -17,11 +21,26 @@ export const meta = {
 // `apps` has to be passed in -- a workflow script cannot read apps.json itself
 // (no filesystem in here), so the calling session reads the registry and hands
 // the packages over:
-//   args: { apps: ['com.example.app'] }
+//   args: { apps: ['com.example.app'], audit: 'capture' }
 // `toolDir` only needs passing when the tool is not where it normally sits.
+//
+// `audit` picks what the first phase does:
+//   'capture' (default) -- drive the phone, then audit against that log
+//   'apk'               -- audit from the APK only, no device driving
+//   'skip'              -- judge whatever triage is already on disk
+// `force: true` re-audits a build already audited; without it the runner skips
+// an unchanged versionCode and the triage on disk still stands, which is the
+// point of the snapshot -- same build, same answer, no reason to drive the
+// phone again.
+// The audit runs here rather than being a separate thing to remember, because a
+// triage nobody refreshed is the failure this whole tool exists to avoid: an
+// APK-only triage carries "chưa thấy trong log" rows that are artefacts of not
+// capturing, and agents handed those rows argue about bugs that do not exist.
 
 const toolDir = args?.toolDir ?? 'tools/ad-checklist-diff'
 const apps = args?.apps ?? []
+const auditMode = args?.audit ?? 'capture'
+const force = args?.force === true
 
 if (apps.length === 0) {
   // Without this the pipeline quietly runs over nothing and returns an empty
@@ -30,6 +49,16 @@ if (apps.length === 0) {
     'Chưa có app nào: truyền args.apps, ví dụ { apps: ["com.example.app"] }. ' +
     'Danh sách package nằm ở ' + toolDir + '/apps.json.',
   )
+}
+
+const AUDIT_SCHEMA = {
+  type: 'object',
+  properties: {
+    command: { type: 'string' },
+    exit_code: { type: 'number' },
+    output: { type: 'string' },
+  },
+  required: ['command', 'exit_code', 'output'],
 }
 
 const FINDINGS_SCHEMA = {
@@ -94,6 +123,34 @@ Tự kiểm lại từ APK/log. Trả holds=false nếu bằng chứng không đ
 có cách giải thích khác hợp lý hơn. Đừng xác nhận chỉ vì nghe hợp lý.`,
   { label: `verify:${pkg}:${f.value}`, phase: 'Verify', schema: VERDICT_SCHEMA },
 )
+
+if (auditMode !== 'skip') {
+  phase('Audit')
+  const flags = (auditMode === 'capture' ? ' --capture' : '') + (force ? ' --force' : '')
+  // Deliberately one agent running one command: the verdicts stay Python's, and
+  // an agent that starts improvising flags is an agent rewriting the audit.
+  const audit = await agent(
+    `Chạy đúng một lệnh này từ thư mục gốc của repo, không thêm bớt cờ nào:
+
+    .venv/bin/python ${toolDir}/audit_runner.py${flags}
+
+Nó có thể lái máy thật và mất vài phút -- chờ cho xong, đừng bỏ ngang, đừng
+chạy lại. Báo "build chưa đổi" là ĐÚNG, không phải lỗi: triage cũ vẫn dùng được
+vì cùng build thì cùng kết quả.
+Nếu lệnh lỗi thì BÁO LẠI nguyên văn, KHÔNG tự sửa lệnh và chạy lại.
+Trả về: command đã chạy, exit code, và toàn bộ output nó in ra.`,
+    { label: 'audit', phase: 'Audit', schema: AUDIT_SCHEMA },
+  )
+  if (!audit || audit.exit_code === 1) {
+    // exit 1 is the runner failing outright; exit 2 just means rows are still
+    // mismatched, which is the normal case the agents exist to explain.
+    throw new Error(
+      `audit_runner.py không chạy được, dừng trước khi agent phán trên triage cũ:\n` +
+      (audit ? audit.output : '(agent không trả về gì)'),
+    )
+  }
+  log(`Audit xong (exit ${audit.exit_code}). Sang phần phán các dòng chưa kết luận được.`)
+}
 
 const results = await pipeline(
   apps,
