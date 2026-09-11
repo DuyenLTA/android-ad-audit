@@ -234,7 +234,11 @@ python audit_runner.py --capture
 ```
 
 `--capture` tự lái máy cho từng app (cả hai luồng user) rồi audit trên đúng log
-vừa ghi, một app một lượt. Log để ở `out/<package>-capture.log`. Luồng nào
+vừa ghi, một app một lượt. Khoảng 2 phút một app, và đó đã là sát sàn: gần hết
+thời gian nằm ở `uiautomator dump` (~3,7s mỗi lần tra node, không cách gọi nào
+nhanh hơn) cùng khoảng dwell cố ý ở Home. Đã đo và đã thử rút nhịp poll xuống --
+không đổi gì, xem `plans/reports/perf-260911-1750-*`. Muốn lượt chạy nhanh hơn
+thì cắt ở lớp agent, đừng cắt ở đây. Log để ở `out/<package>-capture.log`. Luồng nào
 không tới được Home thì bản tóm tắt nói rõ -- các dòng "chưa thấy trong log"
 của lượt đó không đáng tin.
 
