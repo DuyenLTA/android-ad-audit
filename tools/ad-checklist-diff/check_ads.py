@@ -26,6 +26,7 @@ from log_extractor import (  # noqa: F401
     load_trusted_lines,
 )
 from report_renderer import render_html  # noqa: F401
+from console_encoding import use_utf8_console
 
 # Confirmed one-off naming mismatches between a checklist value and the
 # internal key name the app actually logs it under -- same placement/flag,
@@ -291,4 +292,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     sys.exit(main())

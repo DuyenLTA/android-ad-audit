@@ -22,7 +22,7 @@ def is_package_name(value: str) -> bool:
 def installed_packages() -> set[str]:
     """Every package name currently installed on the connected device."""
     out = subprocess.run(
-        ["adb", "shell", "pm", "list", "packages"], capture_output=True, text=True, timeout=15
+        ["adb", "shell", "pm", "list", "packages"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=15
     ).stdout
     return {line.strip()[len("package:"):] for line in out.splitlines() if line.strip()}
 

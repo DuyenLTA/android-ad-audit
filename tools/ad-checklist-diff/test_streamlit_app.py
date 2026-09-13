@@ -23,7 +23,7 @@ class _FakeProc:
 
 
 def _device_attached() -> bool:
-    out = subprocess.run(["adb", "devices"], capture_output=True, text=True, timeout=10).stdout
+    out = subprocess.run(["adb", "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10).stdout
     return any(ln.strip().endswith("device") for ln in out.splitlines()[1:])
 
 

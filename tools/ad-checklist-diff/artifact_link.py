@@ -18,6 +18,7 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from console_encoding import use_utf8_console
 
 LINK_FILE = Path(__file__).parent / "artifact-link.json"
 
@@ -54,6 +55,7 @@ def is_stale(link: dict, report_path: Path) -> bool:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     # `python artifact_link.py <url>` -- how Claude records the URL after
     # publishing the report file.
     if len(sys.argv) != 2:
