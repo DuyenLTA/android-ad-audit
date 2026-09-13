@@ -111,6 +111,53 @@ const VERDICT_SCHEMA = {
   required: ['holds', 'why'],
 }
 
+// Judge and verify ask the same questions of the same files, so they get the
+// same briefing. Verify used to get only the finding text -- no paths, no tool
+// names -- and spent its first third of an hour of wall clock rediscovering the
+// repo with `ls -R` and `find`, reading the tools' source to learn what they do,
+// and finally writing its own zipfile sweep in /tmp. That sweep is exactly what
+// apk_strings.py was built to replace.
+const sources = (pkg) => `Nguồn, dùng đúng các file này, KHÔNG đoán và KHÔNG đi tìm:
+- triage:  ${toolDir}/out/${pkg}-triage.json
+- log capture: ${toolDir}/out/${pkg}-capture.log
+  CẢNH BÁO: adb logcat bắt cả máy, không lọc theo app. App khác đã bị dừng trước
+  khi capture, nhưng FA-SVC (Firebase Analytics, nằm trong Play Services) vẫn
+  upload theo lô những event nó gom từ TRƯỚC đó, và lô đó có thể của app khác.
+  Mỗi lô mang dòng "app_id: <package>" của chính nó. Dòng FA-SVC nào thuộc lô có
+  app_id KHÁC ${pkg} thì KHÔNG phải bằng chứng về build này -- đã có lượt kết
+  luận sai vì lấy ad unit ID của app anh em làm "ID đang chạy mà vắng APK".
+  Bằng chứng runtime đáng tin nằm ở FOR_TESTER_* và inter_ads.
+- snapshot (file lớn, chỉ mở phần cần): ${toolDir}/snapshots/${pkg}.json
+
+- "ID này có trong bản cài không": tra thẳng mảng build_ad_ids trong triage --
+  đó là toàn bộ ad unit ID tool đã quét được từ APK. ĐỪNG tự mở APK ra quét lại.
+  build_ad_ids là null thì mới cần tự kiểm.
+- Chuỗi khác (token, tên placement, tên cờ), chạy đúng một lệnh, đừng tự viết
+  zipfile, đừng đọc source của tool để hiểu nó làm gì:
+
+    cd ${repoDir} && .venv/bin/python ${toolDir}/apk_strings.py --package ${pkg} <chuỗi> <chuỗi>
+
+  \`--package\` là CỜ, không phải positional: mọi tham số không có cờ đều bị coi
+  là chuỗi cần tìm. Nó quét cả UTF-8 lẫn UTF-16LE trong mọi entry, xong trong
+  dưới một giây, và in ra entry chứa chuỗi đó. Tự viết vòng quét tay vừa chậm
+  vừa hay sót UTF-16LE -- sót là báo nhầm "không có trong build" cho chuỗi thật
+  sự có.`
+
+// Vắng mặt trong log KHÔNG BAO GIỜ tự nó là bằng chứng, và điều đó đúng với cả
+// agent phán lẫn agent phản biện -- nên bối cảnh lượt capture cũng dùng chung.
+const captureContext = `TRƯỚC KHI KẾT LUẬN, đọc phần đầu triage để biết lượt capture sinh ra nó đi tới đâu:
+- missed_home không rỗng: các luồng đó chưa tới Home, nên dòng nào phụ thuộc màn
+  sau Home thì chưa kết luận được từ việc log im lặng.
+- missed_home là null: lượt đó không capture gì cả (chỉ đọc APK), nên MỌI kết
+  luận dựa trên "log không có" đều vô giá trị. Log trên đĩa là của lượt trước.
+- empty_filters không rỗng: cả vùng log đó không có dòng nào, xử như trên.
+- version_code trong triage khác trong snapshot, hoặc audited_at đã cũ: nói rõ
+  là đang phán trên ảnh chụp cũ.
+- triage không có các trường trên: file sinh từ bản tool cũ. Xử như không biết gì
+  về lượt capture, và nói rõ điều đó.
+Vắng mặt trong log KHÔNG BAO GIỜ tự nó là bằng chứng, chỉ vắng mặt trong APK mới
+là bằng chứng.`
+
 const judge = (pkg) => agent(
   `Đọc ${toolDir}/out/${pkg}-triage.json trước -- nó có đủ dòng cần phán, kèm
 build_ad_ids, missed_home, empty_filters.
@@ -123,38 +170,14 @@ Với MỖI dòng trong triage (chỉ những dòng này, không xét dòng đã
 - chua-capture-du: dòng này cần luồng/màn chưa được capture
 - khong-ket-luan-duoc: không đủ bằng chứng
 
-Cách kiểm chứng, dùng đúng các nguồn này, KHÔNG đoán:
-- "ID này có trong bản cài không": tra thẳng mảng build_ad_ids trong triage --
-  đó là toàn bộ ad unit ID tool đã quét được từ APK. ĐỪNG tự mở APK ra quét lại.
-  build_ad_ids là null thì mới cần tự kiểm.
-- Chuỗi khác (tên placement, tên cờ), chạy đúng một lệnh, đừng tự viết zipfile:
-
-    cd ${repoDir} && .venv/bin/python ${toolDir}/apk_strings.py ${pkg} <chuỗi> <chuỗi>
-
-  Nó quét cả UTF-8 lẫn UTF-16LE trong mọi entry, xong trong dưới một giây, và in
-  ra entry chứa chuỗi đó. Tự viết vòng quét tay vừa chậm vừa hay sót UTF-16LE --
-  sót là báo nhầm "không có trong build" cho placement thật sự có.
+${sources(pkg)}
 - Nếu tên placement không xuất hiện trong APK thì đó là build-thieu, không phải sai ID
-- Log của lượt capture gần nhất: ${toolDir}/out/${pkg}-capture.log -- tìm cặp
-  key=<high_id>_<normal_id>: nửa kia của cặp đã khớp checklist thì nửa còn lại
-  chính là ID build đang dùng cho dòng twin
+- Trong log tìm cặp key=<high_id>_<normal_id>: nửa kia của cặp đã khớp checklist
+  thì nửa còn lại chính là ID build đang dùng cho dòng twin
 Mỗi finding phải kèm evidence trích dẫn được (tên file + chuỗi tìm thấy/không thấy).
 
-TRƯỚC KHI PHÁN, đọc phần đầu triage để biết lượt capture sinh ra nó đi tới đâu.
-Nó quyết định kết luận nào còn đứng được:
-- missed_home không rỗng: các luồng đó chưa tới Home, nên dòng nào phụ thuộc màn
-  sau Home thì phải là chua-capture-du, KHÔNG được kết luận checklist-sai hay
-  build-thieu chỉ vì log im lặng.
-- missed_home là null: lượt đó không capture gì cả (chỉ đọc APK), nên MỌI kết
-  luận dựa trên "log không có" đều vô giá trị. Log trên đĩa là của lượt trước,
-  có thể khác build.
-- empty_filters không rỗng: cả vùng đó không có dòng log nào, xử như trên.
-- version_code trong triage khác version_code trong snapshot, hoặc audited_at đã
-  cũ: nói rõ trong evidence rằng đang phán trên ảnh chụp cũ.
-- triage không có các trường trên: file sinh từ bản tool cũ, chưa ghi bối cảnh.
-  Xử như không biết gì về lượt capture, và nói rõ điều đó trong evidence.
-Vắng mặt trong log KHÔNG BAO GIỜ tự nó là bằng chứng, chỉ vắng mặt trong APK mới
-là bằng chứng. Thiếu bối cảnh thì trả khong-ket-luan-duoc, đừng đoán bù.`,
+${captureContext}
+Thiếu bối cảnh thì trả khong-ket-luan-duoc, đừng đoán bù.`,
   { label: `judge:${pkg}`, phase: 'Judge', schema: FINDINGS_SCHEMA },
 )
 
@@ -162,8 +185,21 @@ const verify = (pkg, f) => agent(
   `Phản biện kết luận sau về app ${pkg}, dòng checklist "${f.value}".
 Kết luận: ${f.verdict}. Bằng chứng đưa ra: ${f.evidence}
 
-Tự kiểm lại từ APK/log. Trả holds=false nếu bằng chứng không đứng vững hoặc
-có cách giải thích khác hợp lý hơn. Đừng xác nhận chỉ vì nghe hợp lý.`,
+Tự kiểm lại từ APK/log, ĐỪNG tin lời bằng chứng trên. Trả holds=false nếu bằng
+chứng không đứng vững hoặc có cách giải thích khác hợp lý hơn. Đừng xác nhận chỉ
+vì nghe hợp lý.
+
+Kiểm lại độc lập nghĩa là tự chạy lại phép kiểm, KHÔNG phải tự đi tìm lại chỗ để
+chạy. Mọi đường dẫn và công cụ cần dùng nằm ngay dưới đây -- đừng \`ls\`, đừng
+\`find\`, đừng đọc source của tool để đoán nó làm gì.
+
+${sources(pkg)}
+
+${captureContext}
+
+Nếu nhãn của kết luận sai nhưng dữ kiện đúng, holds=false và nói rõ nhãn nào mới
+đúng. Nếu chỗ gãy nằm ở chính tool (một phép kiểm đáng lẽ phải chạy mà không
+chạy), nói thẳng ra -- đó là phát hiện có giá trị hơn việc phán lại dòng đó.`,
   { label: `verify:${pkg}:${f.value}`, phase: 'Verify', schema: VERDICT_SCHEMA },
 )
 
@@ -173,7 +209,12 @@ let unsettled = {}
 
 if (auditMode !== 'skip') {
   phase('Audit')
-  const flags = (auditMode === 'capture' ? ' --capture' : '') + (force ? ' --force' : '')
+  // Every package is named on the command line. Without this the runner walks
+  // the whole registry, so asking about one app drives the phone over all of
+  // them -- and a capture `pm clear`s each app it visits, wiping the data of
+  // apps nobody asked about.
+  const only = apps.map((pkg) => ` --package ${pkg}`).join('')
+  const flags = (auditMode === 'capture' ? ' --capture' : '') + (force ? ' --force' : '') + only
   // Deliberately one agent running one command: the verdicts stay Python's, and
   // an agent that starts improvising flags is an agent rewriting the audit.
   const audit = await agent(

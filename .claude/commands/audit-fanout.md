@@ -1,6 +1,6 @@
 ---
-description: Audit checklist quảng cáo cho app trong registry, rồi xuất báo cáo artifact
-argument-hint: "[tên app hoặc package] [--skip|--apk] [--force]"
+description: Audit checklist quảng cáo cho một app theo package, rồi xuất báo cáo artifact
+argument-hint: "<package> [--skip|--apk] [--force]"
 ---
 
 Chạy workflow `audit-fanout` rồi xuất báo cáo. Tham số người dùng đưa vào: $ARGUMENTS
@@ -20,50 +20,46 @@ Từ đây trở đi mọi lệnh bash đều mở đầu bằng `cd <repo> && �
 truyền cho agent đều là **tuyệt đối**. Agent không thừa hưởng CWD của phiên
 gọi — đường dẫn tương đối là cách chắc chắn nhất để nó đọc nhầm file.
 
-## 1. Đọc registry
+## 1. Lấy package
 
-Không nêu tên app trong `$ARGUMENTS` thì lấy hết registry:
-`<repo>/tools/ad-checklist-diff/apps.json`.
+Command này **chỉ nhận package id**, không nhận tên app. Khớp theo tên là khớp
+mờ: gõ thiếu một ký tự thì nó trả về app hàng xóm chứ không trả về lỗi, và lượt
+capture mặc định `pm clear` đúng cái app nó nhận được — sai app là xoá dữ liệu
+của app không liên quan. Package id gõ sai thì phải hỏng ra mặt, đừng đoán hộ.
 
-Có nêu tên thì **đừng tự so chuỗi** — chạy, theo thứ tự này:
+`$ARGUMENTS` không có chuỗi nào trông như package (`com.abc.xyz`) thì **dừng**,
+in registry ra và hỏi người dùng chọn. Không nêu app thì cũng **đừng chạy cả
+registry thay thế** — mỗi lượt là một app, do người dùng chỉ đích danh.
 
-```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py "<tên>"
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device "<tên>"
-```
-
-Cái đầu tra registry (tức thì). Exit 1 thì chạy cái thứ hai: nó quét **mọi app
-đang cài trên máy** và khớp theo tên hiện trên icon — lần đầu ~15 giây cho cả
-máy, sau đó có cache nên vài giây.
-
-Người ta gõ cái họ nhìn thấy: "Nexus", không phải nickname nội bộ "AI Art", càng
-không phải package id.
-
-Thêm `--add` vào lệnh thứ hai để app tìm được tự vào registry:
+Có package thì phân giải nó — vẫn **đừng tự so chuỗi**:
 
 ```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<tên>"
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --exact "<package>"
 ```
 
-`gid` không phải hỏi: mỗi tab trong sheet có dòng `Package name` của chính nó,
-nên tab nào thuộc app nào là **đọc được**, không đoán. Tên tab là mã dự án, đừng
-cố khớp nó với tên app.
-
-Dòng in ra có `gid=<số>` là xong, chạy tiếp. Hai trường hợp phải **dừng và hỏi
-người dùng**, đừng tự chọn:
-
-- `gid=? (… nhiều tab cùng khai app này)` — sheet có 2 tab cho cùng app, chọn
-  bừa là đối chiếu nhầm checklist
-- `gid=? (sheet không có tab nào khai package này)` — app đang cài nhưng chưa có
-  checklist; không có gì để đối chiếu
+Package **không cần có sẵn trong `apps.json`**. Registry chỉ là cache: mỗi tab
+trong sheet tự khai dòng `Package name` của nó, nên tab nào thuộc app nào là đọc
+được. Registry biết thì trả lời ngay, không biết thì nó hỏi sheet.
 
 Theo exit code:
 
-- `0` — đúng một app, chạy nó
-- `1` — không khớp. **Dừng**, in nguyên danh sách nó gợi ý. Đừng đoán, và tuyệt
-  đối đừng chạy cả registry thay thế: lượt capture mặc định `pm clear` app, chạy
-  nhầm app là xoá dữ liệu của app không liên quan
-- `2` — nhiều app khớp. **Dừng**, liệt kê ra và hỏi người dùng chọn
+- `0` — phân giải được, chạy nó. In kèm `gid=… — từ sheet, chưa có trong
+  registry` nghĩa là app chưa được ghi vào `apps.json`; vẫn chạy bình thường
+- `1` — **dừng**, in nguyên văn lý do. Ba lý do khác nhau, đừng gộp:
+  - *Không phải package id* — người dùng gõ tên app. Hỏi lại package
+  - *Sheet không có tab nào khai package này* — chưa có checklist để đối chiếu.
+    Không có gì để chạy; báo để nhờ ads-team thêm tab
+  - *Sheet có 2 tab cùng khai package này* — chọn bừa là đối chiếu nhầm
+    checklist. **Hỏi người dùng** tab nào đúng, rồi ghi entry vào `apps.json`
+    với `gid` đó
+
+Muốn app khỏi phải tra sheet mỗi lượt thì ghi nó vào registry một lần:
+
+```
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<tên trên icon>"
+```
+
+Đây là tiện ích, không phải điều kiện để chạy.
 
 ## 2. Gọi workflow
 
@@ -96,8 +92,8 @@ Với mỗi app vừa chạy:
 
    ```
    cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
-     --findings out/<package>-findings.html \
-     --notes    out/<package>-notes.html \
+     --findings tools/ad-checklist-diff/out/<package>-findings.html \
+     --notes    tools/ad-checklist-diff/out/<package>-notes.html \
      --highlight <đuôi ID mà phần điều tra có giải thích> \
      --run <run ID workflow vừa trả về> \
      --mode <capture|apk|skip — đúng chế độ vừa chạy> \
@@ -108,21 +104,34 @@ Với mỗi app vừa chạy:
    lại ba thứ đó. Đừng gõ tay chúng vào template: template dùng chung cho mọi
    app, mọi lượt. `delta` và cảnh báo capture thì builder tự đọc từ triage.
 
-   Builder mặc định đọc `snapshots/` và ghi `out/` cạnh chính nó, nên đường dẫn
-   trong lệnh trên tính từ `<repo>`.
+   Builder tự đọc `snapshots/` và ghi `out/` cạnh chính nó, nhưng `--findings`,
+   `--notes`, `--report` thì mở theo CWD — tức tính từ `<repo>`, như trên.
 3. Publish `<repo>/tools/ad-checklist-diff/out/<package>-artifact.html` bằng
    Artifact tool. App nào đã có artifact từ lượt trước thì truyền `url` của nó
    để giữ nguyên link, đừng tạo trang mới.
+4. **Mở trang ngay, đừng bắt người dùng bấm link:**
+
+   ```
+   powershell -NoProfile -Command "Start-Process '<url artifact vừa publish>'"
+   ```
+
+   Chạy nó sau mỗi lần publish, kể cả lượt republish vào link cũ. Người chạy
+   lệnh này đang đợi xem kết quả — bắt họ bấm thêm một cú là thừa một bước.
+   Vẫn in URL ra trong lời báo: browser có thể không mở được, và người ta còn
+   cần link để gửi cho ads-team.
 
 Trang phải mở đầu bằng thống kê khớp/lệch rồi mới tới phần điều tra — builder
 lo sẵn phần đó. Một báo cáo mở đầu bằng đúng một dòng lệch đọc như tool chỉ tìm
 được một dòng, chứ không phải 71/72 khớp.
 
-## 4. Commit
+## 4. Báo cáo markdown
 
-Ghi báo cáo markdown vào `<repo>/plans/reports/`, commit theo conventional
-commits, và push lên remote `duyen` (`origin` là repo khác, không có quyền
-push). `snapshots/` và `out/` nằm trong `.gitignore` — không cố thêm chúng vào.
+Ghi báo cáo vào `<repo>/plans/reports/` — đây là file mà bước 3 truyền vào
+`--report`, nên viết nó trước khi dựng trang.
+
+**Dừng ở đây. Không `git add`, không `git commit`, không `git push`.** Lượt audit
+chỉ sinh ra file; đưa file nào vào lịch sử git là việc của người dùng, không
+phải của command. Muốn commit thì người dùng sẽ tự nói.
 
 ## Báo lại
 
