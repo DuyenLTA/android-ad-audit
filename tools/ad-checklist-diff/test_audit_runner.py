@@ -1,7 +1,13 @@
 import json
 
 import audit_runner
-from audit_runner import audit_one, capture_and_audit, print_summary, run_all, unsettled_rows
+from audit_runner import (
+    audit_one,
+    capture_and_audit,
+    print_summary,
+    run_all,
+    unsettled_rows,
+)
 
 APPS = [{"package": "com.a", "gid": "1", "label": "A"}, {"package": "com.b", "gid": "2"}]
 SHEET = "https://docs.google.com/spreadsheets/d/ABC/edit"
@@ -218,3 +224,4 @@ def test_summary_prints_the_count_the_agent_layer_reads(capsys):
     printed = capsys.readouterr().out
     assert "chưa kết luận: 0" in printed
     assert "chưa kết luận: 2" in printed
+

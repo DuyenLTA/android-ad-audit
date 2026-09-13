@@ -26,8 +26,11 @@ import subprocess
 import sys
 
 from device_flow import DEFAULT_HOME_MATCH
+from collections.abc import Sequence
+
 from device_navigator import drive_to_home, force_stop, launch, splash_logo_spam, wipe_app_data
 from device_ui import adb_run
+from console_encoding import use_utf8_console
 
 PASS_NEW_USER = "new"
 PASS_RETURNING = "old"
@@ -87,8 +90,22 @@ def capture_session(
     timeout: int = 300,
     home_match: str = DEFAULT_HOME_MATCH,
     tap_xy: tuple[int, int] | None = None,
+    also_stop: Sequence[str] = (),
 ) -> list[dict]:
-    """Run the requested journeys into one capture file."""
+    """Run the requested journeys into one capture file.
+
+    `adb logcat` is device-wide, so anything else still running writes into this
+    app's capture. That is not hypothetical: an app left running after its own
+    audit kept loading ads for two minutes into the next app's capture, and its
+    ad unit IDs were then read as evidence about the wrong build. `also_stop`
+    names the apps to silence first -- the other apps of this run -- and the app
+    is stopped again on the way out so it cannot leak into whoever comes next.
+    """
+    run = _adb(serial)
+    for other in also_stop:
+        if other != package:
+            force_stop(other, run=run)
+
     results = []
     with open(out_path, "w", encoding="utf-8") as log_file:
         for name in passes:
@@ -111,7 +128,15 @@ def capture_session(
             print("  màn đã đi qua: " + " -> ".join(result["visited"]))
             for action in result["actions"]:
                 print(f"    {action}")
-            print(f"  tới Home: {'có' if result['reached_home'] else 'KHÔNG (timeout)'}")
+            # Why a pass stopped changes what its silence in the log means, so
+            # the summary says it rather than calling every failure a timeout.
+            why = {
+                "stuck": "KHÔNG (hết cách thử, dừng sớm)",
+                "timeout": "KHÔNG (hết giờ)",
+            }.get(result.get("stopped", "timeout"), "KHÔNG")
+            print(f"  tới Home: {'có' if result['reached_home'] else why}")
+    # Leaving it running is what contaminated the next app's capture.
+    force_stop(package, run=run)
     return results
 
 
@@ -153,4 +178,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     sys.exit(main())

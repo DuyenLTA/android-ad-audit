@@ -227,6 +227,29 @@ python find_app.py --device --add Nexus
   ai.photogenerator.aivideo.aivideogenerator.aiart  (Nexus AI - AI Video Generator)  gid=0
 ```
 
+Khớp theo tên là khớp mờ, tiện lúc gõ tay nhưng nguy lúc chạy tự động: gõ thiếu
+một ký tự thì nó trả app hàng xóm chứ không trả lỗi. Chỗ nào sai app là hỏng —
+`audit_runner.py --capture` `pm clear` app nó nhận được — thì hỏi `--exact`: chỉ
+nhận package id, không so tên, không khớp một phần.
+
+`--exact` **không bắt app phải có trong registry**. Registry biết thì trả lời
+ngay; không biết thì nó hỏi sheet, vì mỗi tab tự khai `Package name` của nó:
+
+```
+python find_app.py --exact ai.photogenerator.aivideo.aivideogenerator.aiart
+→ ai.photogenerator.aivideo.aivideogenerator.aiart  (… · Nexus AI - AI Video Generator)
+
+python find_app.py --exact com.app.chua.ghi.vao.registry
+→ com.app.chua.ghi.vao.registry  (gid=53703266 — từ sheet, chưa có trong registry)
+
+python find_app.py --exact Nexus
+→ Không phải package id: Nexus. Cần dạng com.abc.xyz, không phải tên app.  (exit 1)
+```
+
+Chỉ hai trường hợp bị từ chối, vì cả hai đều thật sự không có gì để đối chiếu:
+sheet không có tab nào khai package đó, hoặc có **hai** tab cùng khai — chọn bừa
+là diff nhầm checklist, nên phải ghi `gid` muốn dùng vào registry.
+
 Không phải khai `gid` bằng tay: mỗi tab có dòng `Package name` của chính nó nên
 tab thuộc app nào là đọc được. Tên tab là mã dự án, không khớp tên app, và
 không cần khớp. Hai tab cùng khai một app, hoặc sheet không có tab nào cho app
@@ -278,6 +301,16 @@ capture cần máy thì phải tuần tự vì chỉ có một máy:
 ```
 python audit_runner.py --capture
 ```
+
+Mặc định là **cả registry**. Chỉ muốn một app thì phải nói ra — `--package` lặp
+lại được, và nhận cả package chưa ghi vào `apps.json` (gid tra từ sheet):
+
+```
+python audit_runner.py --capture --package com.example.app
+```
+
+Không có cờ này thì hỏi về một app vẫn lái máy qua mọi app còn lại, và `--capture`
+`pm clear` từng app nó ghé — tức là xoá dữ liệu của app không ai hỏi tới.
 
 `--capture` tự lái máy cho từng app (cả hai luồng user) rồi audit trên đúng log
 vừa ghi, một app một lượt. Khoảng 2 phút một app, và đó đã là sát sàn: gần hết

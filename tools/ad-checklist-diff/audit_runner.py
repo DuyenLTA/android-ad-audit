@@ -1,6 +1,12 @@
-"""Audit every app in the registry, skipping builds already audited.
+"""Audit the apps in the registry, skipping builds already audited.
 
-The fan-out layer. Two things decide how much work a run does:
+The fan-out layer. Three things decide how much work a run does:
+
+- **Which apps were asked for.** `--package` narrows the run to named packages;
+  without it every app in the registry is audited. A capture `pm clear`s each app
+  it visits, so a caller auditing one app has to be able to say so -- otherwise
+  asking about one app wipes the data of every other app in the registry. The
+  package need not be in the registry: the sheet knows which tab declares it.
 
 - **versionCode.** Same build as the last snapshot means the APK is byte-for-
   byte what was already checked, so the app is skipped unless `--force`.
@@ -21,12 +27,19 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from apk_source import apk_ad_ids, base_apk, cache_path, device_version_code
-from app_registry import DEFAULT_REGISTRY, load_apps, registry_sheet, sheet_url_for
+from app_registry import (
+    DEFAULT_REGISTRY,
+    load_apps,
+    registry_sheet,
+    resolve_packages,
+    sheet_url_for,
+)
 from audit_pipeline import run_audit
 from audit_snapshot import diff_results, load, save, triage
 from check_ads import DEFAULT_FILTERS
 from device_driver import capture_session
 from device_flow import DEFAULT_HOME_MATCH
+from console_encoding import use_utf8_console
 
 DEFAULT_OUT_DIR = Path(__file__).parent / "out"
 
@@ -159,6 +172,7 @@ def capture_and_audit(
     serial: str | None = None,
     timeout: int = 300,
     snapshots_dir=None,
+    also_stop=(),
 ) -> dict:
     """Device lane for one app: drive the phone, then audit against that capture.
 
@@ -192,6 +206,7 @@ def capture_and_audit(
         timeout=timeout,
         home_match=app.get("home_match") or DEFAULT_HOME_MATCH,
         tap_xy=tuple(splash_tap) if splash_tap else None,
+        also_stop=also_stop,
     )
 
     missed_home = [p["pass"] for p in passes if not p["reached_home"]]
@@ -239,6 +254,9 @@ def run_all(
                     serial=serial,
                     timeout=timeout,
                     snapshots_dir=snapshots_dir,
+                    # The capture lane is device-wide; every other app of this
+                    # run has to be quiet or its log lines land in this one.
+                    also_stop=[a["package"] for a in apps],
                 )
             return audit_one(app, base_sheet, out_dir=out_dir, force=force, snapshots_dir=snapshots_dir)
         except SystemExit as e:  # pipeline signals user-facing errors this way
@@ -290,12 +308,19 @@ def print_summary(results: list[dict]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Audit toàn bộ app trong registry")
+    parser = argparse.ArgumentParser(description="Audit app theo --package; không nêu thì cả registry")
     parser.add_argument(
         "--sheet",
         help="URL sheet gốc (gid lấy từ registry). Bỏ qua nếu registry đã khai \"sheet\"",
     )
     parser.add_argument("--registry", help="apps.json (mặc định cạnh file này)")
+    parser.add_argument(
+        "--package",
+        action="append",
+        default=[],
+        metavar="PACKAGE",
+        help="Chỉ audit package này, lặp lại được; không cần có sẵn trong registry. Mặc định: cả registry",
+    )
     parser.add_argument("--out", default=str(DEFAULT_OUT_DIR))
     parser.add_argument("--force", action="store_true", help="Chạy cả khi versionCode chưa đổi")
     parser.add_argument("--workers", type=int, default=4)
@@ -320,6 +345,11 @@ def main() -> int:
             "(xem apps.example.json)"
         )
 
+    # After the sheet URL is known: a package outside the registry gets its tab
+    # from the sheet, and that needs the sheet.
+    if args.package:
+        apps = resolve_packages(args.package, apps, sheet)
+
     results = run_all(
         apps,
         sheet,
@@ -338,4 +368,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     sys.exit(main())

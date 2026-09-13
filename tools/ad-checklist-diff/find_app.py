@@ -2,6 +2,7 @@
 
     python find_app.py Nexus
     python find_app.py --device "AI Video"   # mọi app đang cài, không cần registry
+    python find_app.py --exact com.example.app   # không so tên, chỉ tra đúng id
 
 Prints one line per match. Exit 0 on a single match, 1 on none, 2 on several --
 so the caller can tell "pick one" apart from "no such app" instead of guessing
@@ -11,6 +12,12 @@ either way.
 shows on its icon. That is the name people know; the registry's label is an
 internal nickname and the package id is not something anyone should have to
 type.
+
+`--exact` is the opposite trade: no name matching at all, the query must be a
+package id. Fuzzy name matching resolves a typo to a neighbouring app instead of
+failing, and the audit's default mode `pm clear`s whatever it is handed -- so the
+caller that wants "this app or nothing" asks for it here rather than hoping the
+match was right. The package need not be in the registry; the sheet is asked.
 """
 import argparse
 import json
@@ -18,9 +25,10 @@ import sys
 from pathlib import Path
 
 from app_label import match_apps, names_for, screen_name
-from app_registry import DEFAULT_REGISTRY, load_apps, registry_sheet
+from app_registry import DEFAULT_REGISTRY, load_apps, registry_sheet, resolve_packages
 from device_apps import installed_packages, labels
 from sheet_tabs import gids_by_package
+from console_encoding import use_utf8_console
 
 
 def main() -> None:
@@ -32,6 +40,10 @@ def main() -> None:
         help="tìm trong mọi app đang cài trên máy, bỏ qua registry",
     )
     parser.add_argument(
+        "--exact", action="store_true",
+        help="query phải đúng bằng một package id trong registry, không so tên",
+    )
+    parser.add_argument(
         "--refresh-tabs", action="store_true",
         help="đọc lại danh sách tab trong sheet (khi vừa thêm app mới)",
     )
@@ -40,6 +52,10 @@ def main() -> None:
         help="ghi app tìm được vào registry (chỉ khi gid đã xác định)",
     )
     args = parser.parse_args()
+
+    if args.exact:
+        _report_exact(args.query, args.registry)
+        return
 
     if args.device:
         found = labels(installed_packages())
@@ -63,6 +79,22 @@ def main() -> None:
         shown = screen_name(app["package"]) or app.get("label") or app["package"]
         print(f"{app['package']}  ({shown})")
     sys.exit(0 if len(matches) == 1 else 2)
+
+
+def _report_exact(query: str, registry: str) -> None:
+    """Lookup by package id only -- same exit codes, zero guessing.
+
+    Registry first, then the sheet, so an app nobody wrote into `apps.json` still
+    resolves. Never exits 2: one package names at most one checklist tab, and the
+    ambiguous case (two tabs) is refused rather than reported as a choice.
+    """
+    apps = load_apps(registry)
+    resolved = resolve_packages([query], apps, registry_sheet(registry))
+    app = resolved[0]
+    known = any(a["package"] == query for a in apps)
+    shown = " · ".join(names_for(app)) if known else f"gid={app['gid']} — từ sheet, chưa có trong registry"
+    print(f"{app['package']}  ({shown})")
+    sys.exit(0)
 
 
 def _tab_for(package: str, registry: str, refresh: bool) -> str:
@@ -119,4 +151,5 @@ def _report_device(
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     main()
