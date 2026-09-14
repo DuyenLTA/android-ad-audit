@@ -8,8 +8,19 @@ KEY_VALUE_RE = re.compile(r"key=([\w.]+),\s*value=(\w+)")
 KEY_MENTION_RE = re.compile(r"key=([\w.]+)")
 SHOW_PREFIX = "show_"
 
+# Firebase Analytics lives in Play Services, not in the app, and uploads events
+# in batches it gathered earlier -- including batches belonging to other apps.
+# `adb logcat` is device-wide, so those land in this capture, and an ad unit id
+# read out of one is evidence about somebody else's build. Each batch names its
+# own owner first; every FA-SVC line after that belongs to the named app until
+# another name appears.
+FA_TAG = "FA-SVC"
+FA_APP_ID_RE = re.compile(r"\bapp_id: ([a-z][\w.]+)")
 
-def load_trusted_lines(log_path: str, filters: list[str]) -> dict[str, list[str]]:
+
+def load_trusted_lines(
+    log_path: str, filters: list[str], package: str | None = None
+) -> dict[str, list[str]]:
     """Return, per --filter substring, every log line that contains it.
 
     Keeping this per-filter (rather than one flat pool) lets the caller warn
@@ -24,8 +35,17 @@ def load_trusted_lines(log_path: str, filters: list[str]) -> dict[str, list[str]
     silent and five correct rows were reported as mismatched.
     """
     trusted: dict[str, list[str]] = {flt: [] for flt in filters}
+    batch_owner = None
     with open(log_path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
+            if FA_TAG in line:
+                named = FA_APP_ID_RE.search(line)
+                if named:
+                    batch_owner = named.group(1)
+                # Only ever drops lines from a batch that named a different app;
+                # an unnamed batch stays in, because unknown is not foreign.
+                if package and batch_owner and batch_owner != package:
+                    continue
             for flt in filters:
                 if flt in line:
                     trusted[flt].append(line)

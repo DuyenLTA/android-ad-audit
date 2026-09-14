@@ -34,6 +34,7 @@ from collections.abc import Sequence
 from check_ads import DEFAULT_FILTERS
 from console_encoding import use_utf8_console
 from device_flow import DEFAULT_HOME_MATCH
+from build_identity import log_watcher
 from device_navigator import drive_to_home, force_stop, launch, splash_logo_spam, wipe_app_data
 from device_ui import adb_run
 
@@ -133,8 +134,18 @@ def capture_pass(
         tapped = splash_logo_spam(tap_xy, package=package, run=run)
         # dwell=0: the wait on Home is done here instead, where the capture file
         # is in hand and can say when the app has actually finished requesting.
+        # The build names itself in the log about a second after launch. Polled
+        # on the journey's own loop, that turns "walk every screen of a build
+        # nobody should audit" into a few seconds.
+        log_path = getattr(log_file, "name", None)
+        watch = log_watcher(log_path, flush=log_file.flush) if log_path else None
         result = drive_to_home(
-            package=package, home_match=home_match, timeout=timeout, dwell=0, run=run
+            package=package,
+            home_match=home_match,
+            timeout=timeout,
+            dwell=0,
+            run=run,
+            should_abandon=watch,
         )
         if result["reached_home"]:
             log_file.flush()
@@ -207,6 +218,10 @@ def capture_session(
                 )
             result["pass"] = name
             results.append(result)
+            if result.get("stopped") == "abandoned":
+                # Every remaining pass would be driven through the same build.
+                print("  dừng sớm: " + "; ".join(result["actions"][-1:]))
+                break
             print("  màn đã đi qua: " + " -> ".join(result["visited"]))
             for action in result["actions"]:
                 print(f"    {action}")

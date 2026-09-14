@@ -20,6 +20,19 @@ from apk_verifier import SAMPLE_PUBLISHERS
 # Printed by the Adjust SDK when the build points at its test environment.
 SANDBOX_MARKER = "sandbox"
 
+# What a dev build says about itself in the log, and how soon. Both of these
+# appear within about a second of launch, long before the journey is over, so a
+# run that watches for them can stop driving instead of walking every screen of
+# a build whose report nobody should read.
+DEV_LOG_MARKERS = (
+    ("Config variant dev: true", "build tự khai Config variant dev: true"),
+    ("setupAdjust: sandbox", "build tự khai Adjust environment = sandbox"),
+)
+
+# Enough overlap between reads that a marker landing across a chunk boundary is
+# still seen whole.
+_TAIL = max(len(marker) for marker, _ in DEV_LOG_MARKERS)
+
 
 def _observed(result: dict) -> list[str]:
     """Every value this run saw: matched rows plus the leftovers."""
@@ -53,3 +66,36 @@ def dev_build_signals(result: dict | None) -> list[str]:
         signals.append("Adjust đang ở môi trường sandbox")
 
     return signals
+
+
+def log_watcher(path: str, flush=None):
+    """A callable that reports, once, that the log names this a dev build.
+
+    Reads only what has arrived since the last call, so it can be polled on the
+    journey's own loop without re-reading a capture that grows to megabytes.
+    Returns a reason string, or None to carry on.
+    """
+    state = {"offset": 0, "tail": ""}
+
+    def check() -> str | None:
+        if flush:
+            flush()
+        try:
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                handle.seek(state["offset"])
+                chunk = handle.read()
+                state["offset"] = handle.tell()
+        except OSError:
+            # The capture file not being readable yet is not an answer about
+            # the build; the next poll asks again.
+            return None
+        if not chunk:
+            return None
+        text = state["tail"] + chunk
+        state["tail"] = text[-_TAIL:]
+        for marker, reason in DEV_LOG_MARKERS:
+            if marker in text:
+                return reason
+        return None
+
+    return check

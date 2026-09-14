@@ -123,13 +123,20 @@ def drive_to_home(
     xml_fn=None,
     run=adb_run,
     sleep=time.sleep,
+    should_abandon=None,
 ) -> dict:
     """Poll the focused screen, perform its next step, stop at Home.
 
-    Three ways out: Home, nothing left to try (`stuck`), or the deadline. The
-    deadline is the backstop, not the plan -- a journey that cannot reach Home
-    used to sit on a dead screen until the full timeout elapsed, which is pure
-    waste and, worse, indistinguishable in the summary from a slow success.
+    Four ways out: Home, nothing left to try (`stuck`), the deadline, or
+    `should_abandon` saying the journey is not worth finishing. The deadline is
+    the backstop, not the plan -- a journey that cannot reach Home used to sit on
+    a dead screen until the full timeout elapsed, which is pure waste and, worse,
+    indistinguishable in the summary from a slow success.
+
+    `should_abandon` is called once per poll and returns a reason, or None to
+    carry on. It exists for facts that only the log can tell and that settle the
+    whole run: an app announcing itself a dev build one second after launch means
+    every screen after this one is being driven for a report nobody should read.
     """
     xml_fn = xml_fn or (lambda: ui_xml(run=run))
     rules = rules if rules is not None else DEFAULT_RULES
@@ -150,6 +157,13 @@ def drive_to_home(
     idle = 0
 
     while time.monotonic() < deadline:
+        if should_abandon:
+            reason = should_abandon()
+            if reason:
+                actions.append(reason)
+                stopped = "abandoned"
+                break
+
         found = focused_package_activity(run=run)
         focused_pkg, activity = found if found else ("", "")
         short = activity.rsplit(".", 1)[-1]

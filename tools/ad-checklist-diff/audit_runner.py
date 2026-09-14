@@ -246,6 +246,20 @@ def capture_and_audit(
 
     missed_home = [p["pass"] for p in passes if not p["reached_home"]]
 
+    # The capture gave up because the build announced itself a dev build. There
+    # is nothing to diff: the checklist lists production values and this build
+    # does not serve them.
+    abandoned = [p for p in passes if p.get("stopped") == "abandoned"]
+    if abandoned and not allow_dev_build:
+        reasons = [a for p in abandoned for a in p.get("actions", [])[-1:]]
+        return {
+            "package": package,
+            "label": label,
+            "wrong_build": reasons or ["capture bỏ dở: build tự khai là build dev"],
+            "version_code": version_code,
+            "capture_log": str(log_path),
+        }
+
     # Already decided to run above; `force` here only stops the second skip check.
     summary = audit_one(
         app,
