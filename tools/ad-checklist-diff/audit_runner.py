@@ -67,6 +67,7 @@ def audit_one(
     capture_log: str | None = None,
     missed_home: list[str] | None = None,
     snapshots_dir=None,
+    allow_dev_build: bool = False,
 ) -> dict:
     """Audit a single app; returns a summary dict (never raises for one app)."""
     package = app["package"]
@@ -108,6 +109,26 @@ def audit_one(
         # ở mọi lượt APK-only dù app đang cài ngay trên máy.
         use_device=True,
     )
+
+    # Stop here rather than report a score nobody should read. A checklist lists
+    # production values; a dev build serves the SDK's sample ad units, so nearly
+    # every row misses and every miss reads as the sheet being wrong. The rest of
+    # a run on such a build is time spent producing that misreading -- agents
+    # arguing row by row about a mismatch whose only cause is which APK is on the
+    # phone.
+    #
+    # Nothing is written on the way out. The snapshot is the baseline the next
+    # run's delta is measured against, and a dev build's result is not a baseline
+    # for anything; saving it would make the following release run report 45
+    # "fixed" rows that were never broken.
+    signals = dev_build_signals(result)
+    if signals and not allow_dev_build:
+        return {
+            "package": package,
+            "label": label,
+            "wrong_build": signals,
+            "version_code": version_code,
+        }
 
     delta = diff_results(previous, result)
     save(package, result, version_code, **snap_kwargs)
@@ -186,6 +207,7 @@ def capture_and_audit(
     timeout: int = 300,
     snapshots_dir=None,
     also_stop=(),
+    allow_dev_build: bool = False,
 ) -> dict:
     """Device lane for one app: drive the phone, then audit against that capture.
 
@@ -233,6 +255,7 @@ def capture_and_audit(
         capture_log=str(log_path),
         missed_home=missed_home,
         snapshots_dir=snapshots_dir,
+        allow_dev_build=allow_dev_build,
     )
     summary["capture_log"] = str(log_path)
     summary["missed_home"] = missed_home
@@ -250,6 +273,7 @@ def run_all(
     serial: str | None = None,
     timeout: int = 300,
     snapshots_dir=None,
+    allow_dev_build: bool = False,
 ) -> list[dict]:
     """Audit every app. APK-only work is parallel -- no device is involved.
 
@@ -267,11 +291,19 @@ def run_all(
                     serial=serial,
                     timeout=timeout,
                     snapshots_dir=snapshots_dir,
+                    allow_dev_build=allow_dev_build,
                     # The capture lane is device-wide; every other app of this
                     # run has to be quiet or its log lines land in this one.
                     also_stop=[a["package"] for a in apps],
                 )
-            return audit_one(app, base_sheet, out_dir=out_dir, force=force, snapshots_dir=snapshots_dir)
+            return audit_one(
+                app,
+                base_sheet,
+                out_dir=out_dir,
+                force=force,
+                snapshots_dir=snapshots_dir,
+                allow_dev_build=allow_dev_build,
+            )
         except SystemExit as e:  # pipeline signals user-facing errors this way
             return {"package": app["package"], "error": str(e)}
 
@@ -293,10 +325,29 @@ def _unsettled_note(result: dict) -> str:
     return "" if count is None else f" | chưa kết luận: {count}"
 
 
+def exit_code_for(results: list[dict]) -> int:
+    """What the process exits with, so callers can branch without parsing text.
+
+    3 is its own code so a caller can tell "wrong build, nothing was audited"
+    from "the runner broke" (1) and from "rows are mismatched" (2). The first two
+    mean the report is wrong; this one means there is no report at all, and a
+    caller that treats it as 2 goes on to judge a triage from another build.
+    """
+    if any(r.get("wrong_build") for r in results):
+        return 3
+    if any(r.get("error") for r in results):
+        return 1
+    return 2 if any(r.get("delta", {}).get("broke") for r in results) else 0
+
+
 def print_summary(results: list[dict]) -> None:
     for r in results:
         name = r.get("label") or r["package"]
-        if r.get("error"):
+        if r.get("wrong_build"):
+            print(f"  [SAI BUILD] {name}: {'; '.join(r['wrong_build'])}")
+            print("         Checklist ghi giá trị production. Cài bản release rồi chạy lại,")
+            print("         hoặc thêm --allow-dev-build nếu thật sự muốn audit build này.")
+        elif r.get("error"):
             print(f"  [lỗi]  {name}: {r['error']}")
         elif r.get("skipped"):
             print(
@@ -343,6 +394,11 @@ def main() -> int:
         help="Tự lái máy capture log cho từng app (tuần tự, cần device); mặc định chỉ đọc APK",
     )
     parser.add_argument("--serial", help="adb serial, khi cắm nhiều máy")
+    parser.add_argument(
+        "--allow-dev-build",
+        action="store_true",
+        help="Chạy tiếp cả khi nhận ra đây là build dev (ID ads mẫu / Adjust sandbox)",
+    )
     parser.add_argument("--timeout", type=int, default=300, help="Giới hạn mỗi luồng khi capture, giây")
     args = parser.parse_args()
 
@@ -372,12 +428,11 @@ def main() -> int:
         capture=args.capture,
         serial=args.serial,
         timeout=args.timeout,
+        allow_dev_build=args.allow_dev_build,
     )
     print_summary(results)
 
-    if any(r.get("error") for r in results):
-        return 1
-    return 2 if any(r.get("delta", {}).get("broke") for r in results) else 0
+    return exit_code_for(results)
 
 
 if __name__ == "__main__":

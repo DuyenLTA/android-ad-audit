@@ -225,3 +225,75 @@ def test_summary_prints_the_count_the_agent_layer_reads(capsys):
     assert "chưa kết luận: 0" in printed
     assert "chưa kết luận: 2" in printed
 
+
+
+# --- A dev build stops the run instead of scoring it ------------------------
+# A checklist lists production values, so against a dev build nearly every row
+# misses and every miss reads as the sheet being wrong. Everything after the
+# diff is time spent producing that misreading.
+
+SAMPLE_ID = "ca-app-pub-3940256099942544/2247696110"
+
+
+def _audit_stubs(monkeypatch, result, saved, tmp_path):
+    monkeypatch.setattr(audit_runner, "device_version_code", lambda pkg: 12)
+    monkeypatch.setattr(audit_runner, "load", lambda pkg, **kw: None)
+    monkeypatch.setattr(audit_runner, "base_apk", lambda pkg: (str(tmp_path / "x.apk"), False))
+    monkeypatch.setattr(audit_runner, "run_audit", lambda *a, **kw: (result, []))
+    monkeypatch.setattr(audit_runner, "apk_ad_ids", lambda path: set())
+    monkeypatch.setattr(
+        audit_runner, "save", lambda *a, **kw: saved.append(a) or {}
+    )
+
+
+def _app():
+    return {"package": "com.x", "gid": "1", "label": "X"}
+
+
+def test_a_dev_build_stops_before_anything_is_written(monkeypatch, tmp_path):
+    saved = []
+    result = {"extra": [SAMPLE_ID, "sandbox"], "sections": {}}
+    _audit_stubs(monkeypatch, result, saved, tmp_path)
+
+    summary = audit_runner.audit_one(_app(), "http://sheet", out_dir=tmp_path)
+
+    assert summary["wrong_build"]
+    assert "score" not in summary
+    # The snapshot is the baseline the next run's delta is measured against, and
+    # a dev build is not a baseline for anything: saving it would make the
+    # following release run report dozens of "fixed" rows that were never broken.
+    assert saved == []
+    assert not list(tmp_path.glob("*-triage.json"))
+
+
+def test_allow_dev_build_runs_it_anyway(monkeypatch, tmp_path):
+    saved = []
+    result = {"extra": [SAMPLE_ID], "sections": {}}
+    _audit_stubs(monkeypatch, result, saved, tmp_path)
+
+    summary = audit_runner.audit_one(
+        _app(), "http://sheet", out_dir=tmp_path, allow_dev_build=True
+    )
+
+    assert "wrong_build" not in summary
+    assert saved
+
+
+def test_a_release_build_is_untouched_by_the_check(monkeypatch, tmp_path):
+    saved = []
+    result = {"extra": ["ca-app-pub-4973559944609228/2720278708"], "sections": {}}
+    _audit_stubs(monkeypatch, result, saved, tmp_path)
+
+    summary = audit_runner.audit_one(_app(), "http://sheet", out_dir=tmp_path)
+
+    assert "wrong_build" not in summary
+    assert saved
+
+
+def test_wrong_build_gets_its_own_exit_code():
+    # 1 means the runner broke and 2 means rows are mismatched -- both say the
+    # report is wrong. This one says there is no report.
+    assert audit_runner.exit_code_for([{"wrong_build": ["x"]}]) == 3
+    assert audit_runner.exit_code_for([{"error": "boom"}]) == 1
+    assert audit_runner.exit_code_for([{"delta": {"broke": ["r"]}}]) == 2
+    assert audit_runner.exit_code_for([{"delta": {"broke": []}}]) == 0

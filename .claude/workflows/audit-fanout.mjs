@@ -294,6 +294,18 @@ thì BỎ app đó ra khỏi "apps", đừng đoán số 0 -- không biết thì
       (audit ? audit.output : '(agent không trả về gì)'),
     )
   }
+  if (audit.exit_code === 3) {
+    // Wrong build: the runner audited a dev build and wrote nothing. There is no
+    // triage to judge, and judging the previous one would answer about a
+    // different APK. Stopping here is the whole point -- the agents are what
+    // this run would otherwise spend, arguing row by row about a mismatch whose
+    // only cause is which build is on the phone.
+    throw new Error(
+      'Sai build: audit_runner.py nhận ra đây là build dev nên không audit.\n' +
+      'Cài bản release rồi chạy lại, hoặc thêm --allow-dev-build nếu thật sự ' +
+      'muốn audit build này.\n\n' + audit.output,
+    )
+  }
   unsettled = Object.fromEntries(
     (audit.apps ?? []).map((a) => [a.package, a.unsettled]),
   )
