@@ -17,6 +17,12 @@ Each audited app has its own artifact, so those URLs are kept per package in
 `artifact-links.json`. Without that record a later run has no way to know an app
 already has a page, and publishes a second one -- the shared link people already
 have then quietly stops being the current report.
+
+Recording a URL opens it. There is exactly one reason a package's link gets
+written -- a run just finished and published its report -- so opening is what
+the caller wanted every time, and making it a flag only created a way to forget
+it. Reading a link back (`--show`) opens nothing: that runs *before* publishing,
+to find out whether a page already exists.
 """
 import argparse
 import json
@@ -102,8 +108,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Ghi / mở link artifact")
     parser.add_argument("url", nargs="?", help="URL vừa publish")
     parser.add_argument("--package", help="ghi link cho riêng app này")
-    parser.add_argument("--show", action="store_true", help="in link đã lưu")
-    parser.add_argument("--open", action="store_true", help="mở link trong trình duyệt")
+    parser.add_argument("--show", action="store_true", help="in link đã lưu, không mở")
+    # Kept so older callers still parse; opening is the default now.
+    parser.add_argument("--open", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--no-open", dest="no_open", action="store_true", help="chỉ ghi link, đừng mở")
     args = parser.parse_args()
 
     if args.package:
@@ -113,7 +121,9 @@ def main() -> None:
         if not url:
             raise SystemExit(f"Chưa có link nào cho {args.package}")
         print(url)
-        if args.open and not open_in_browser(url):
+        # Opens when a URL was just recorded. `--show` is the pre-publish
+        # lookup, so it stays silent in the browser.
+        if args.url and not args.no_open and not open_in_browser(url):
             print("Không mở được trình duyệt ở máy này.", file=sys.stderr)
         return
 

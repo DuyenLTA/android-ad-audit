@@ -118,15 +118,18 @@ Với mỗi app vừa chạy:
    thì publish mới.
 
 4. Publish `<repo>/tools/ad-checklist-diff/out/<package>-artifact.html` bằng
-   Artifact tool, rồi ghi lại link và **mở luôn**:
+   Artifact tool, rồi ghi lại link — **bước này bắt buộc, không phải tuỳ chọn**:
 
    ```
    cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
-     --package <package> --open <url vừa publish>
+     --package <package> <url vừa publish>
    ```
 
-   Lệnh này vừa lưu link cho lượt sau vừa bật trình duyệt. Máy không có màn hình
-   thì nó báo ra stderr và vẫn lưu link — không coi đó là lỗi của lượt chạy.
+   Ghi link là **tự mở trình duyệt**, không cần cờ gì thêm: lượt chạy nào xong
+   cũng phải bật trang lên cho người dùng xem, nên đó là mặc định chứ không phải
+   thứ để nhớ bật. Máy không có màn hình thì nó báo ra stderr và vẫn lưu link —
+   không coi đó là lỗi của lượt chạy. (`--no-open` chỉ dùng khi người dùng bảo
+   đừng mở.)
 
    Vẫn in URL ra trong lời báo: browser có thể không mở được, và người ta còn
    cần link để gửi cho ads-team.
