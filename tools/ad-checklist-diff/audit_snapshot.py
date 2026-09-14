@@ -13,6 +13,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from apk_verifier import AD_ID_APK_CANNOT_ANSWER_NOTE
+
 DEFAULT_DIR = Path(__file__).parent / "snapshots"
 
 
@@ -90,18 +92,29 @@ def diff_results(old: dict | None, new: dict) -> dict:
 # attention only where the tool genuinely cannot decide.
 NOT_IN_BUILD = "không có trong build"
 NO_LOG_EVIDENCE = "chưa thấy trong log"
+# Kept apart from NOT_IN_BUILD on purpose. Both mean "the APK sweep did not find
+# it", but they point opposite ways: NOT_IN_BUILD is evidence against the
+# checklist, this one is the sweep saying it had nothing to offer, because the
+# build keeps its real ad unit ids in remote config. Merging them is what put 44
+# rows under "nghi checklist ghi ID không tồn tại trong build" on a build whose
+# real ids were never in the APK to begin with.
+APK_CANNOT_ANSWER = "APK không kiểm được (ID nạp lúc chạy)"
 OTHER = "khác"
 
 
 def triage(result: dict) -> dict[str, list[dict]]:
     """Group unmatched rows by what kind of answer each one needs."""
-    buckets: dict[str, list[dict]] = {NOT_IN_BUILD: [], NO_LOG_EVIDENCE: [], OTHER: []}
+    buckets: dict[str, list[dict]] = {
+        NOT_IN_BUILD: [], NO_LOG_EVIDENCE: [], APK_CANNOT_ANSWER: [], OTHER: []
+    }
     for section, rows in result.get("sections", {}).items():
         for row in rows:
             if row["found"]:
                 continue
             note = row.get("note") or ""
-            if "không tìm thấy ID này trong APK" in note.lower() or "không tìm thấy id này trong apk" in note.lower():
+            if AD_ID_APK_CANNOT_ANSWER_NOTE in note:
+                bucket = APK_CANNOT_ANSWER
+            elif "không tìm thấy id này trong apk" in note.lower():
                 bucket = NOT_IN_BUILD
             elif "không thấy" in note.lower():
                 bucket = NO_LOG_EVIDENCE

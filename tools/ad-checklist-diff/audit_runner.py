@@ -27,6 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from apk_source import apk_ad_ids, base_apk, cache_path, device_version_code
+from apk_verifier import scan_can_answer
 from app_registry import (
     DEFAULT_REGISTRY,
     load_apps,
@@ -139,6 +140,13 @@ def audit_one(
                 "capture_log": capture_log,
                 "missed_home": missed_home,
                 "build_ad_ids": build_ad_ids,
+                # Whether "not in build_ad_ids" means anything for this build.
+                # False when the APK embeds only the SDK's sample ids, i.e. the
+                # real ones arrive at runtime -- then absence is not evidence and
+                # every ad-id row has to be settled from the log instead.
+                "apk_scan_applicable": (
+                    scan_can_answer(set(build_ad_ids)) if build_ad_ids is not None else None
+                ),
                 "delta": delta,
                 "triage": triage_rows,
                 "empty_filters": empty_filters,

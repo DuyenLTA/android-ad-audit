@@ -1,3 +1,4 @@
+import apk_verifier
 import os
 import zipfile
 
@@ -173,3 +174,60 @@ def test_a_token_absent_from_the_build_says_so(monkeypatch, tmp_path):
     row = result["sections"]["S"][0]
     assert row["found"] is False
     assert "không tồn tại trong build" in row["note"]
+
+
+# --- The APK sweep has to know when it cannot answer -------------------------
+# An app that fetches its ad unit ids from remote config ships an APK carrying
+# only the SDK's sample ids. Every real id is then "absent from the APK", which
+# is the normal state there, not evidence against the checklist.
+
+SAMPLE_ONLY = {
+    "ca-app-pub-0000000000000000~0000000000",
+    "ca-app-pub-3940256099942544/1033173712",
+    "ca-app-pub-3940256099942544/2247696110",
+}
+REAL_IDS = SAMPLE_ONLY | {"ca-app-pub-4973559944609228/2720278708"}
+
+
+def test_only_sample_ids_means_the_sweep_cannot_answer():
+    assert apk_verifier.scan_can_answer(SAMPLE_ONLY) is False
+
+
+def test_one_real_id_is_enough_to_answer():
+    assert apk_verifier.scan_can_answer(REAL_IDS) is True
+
+
+def test_an_empty_sweep_cannot_answer():
+    assert apk_verifier.scan_can_answer(set()) is False
+
+
+def _row(value):
+    return {"value": value, "found": False, "note": None}
+
+
+def test_absent_row_is_not_blamed_on_the_checklist_when_the_sweep_is_blind(monkeypatch):
+    # The regression this guards: 44 rows were labelled "nghi checklist ghi ID
+    # không tồn tại" on an app whose real ids were never in the APK at all.
+    monkeypatch.setattr(apk_verifier, "apk_ad_ids", lambda path: SAMPLE_ONLY)
+    row = _row("ca-app-pub-4973559944609228/8809501688")
+    apk_verifier._apply_ad_id_rows([row], "x.apk")
+    assert row["found"] is False
+    assert row["note"] == apk_verifier.AD_ID_APK_CANNOT_ANSWER_NOTE
+    assert "nghi checklist" not in row["note"]
+
+
+def test_absent_row_still_accuses_the_checklist_when_the_sweep_can_see(monkeypatch):
+    # The original behaviour has to survive wherever the sweep is still valid.
+    monkeypatch.setattr(apk_verifier, "apk_ad_ids", lambda path: REAL_IDS)
+    row = _row("ca-app-pub-4973559944609228/8809501688")
+    apk_verifier._apply_ad_id_rows([row], "x.apk")
+    assert row["note"] == apk_verifier.AD_ID_NOT_IN_APK_NOTE
+
+
+def test_a_row_matching_a_sample_id_still_counts_as_found(monkeypatch):
+    # An app legitimately shipping a test id is confirmed, not excused.
+    monkeypatch.setattr(apk_verifier, "apk_ad_ids", lambda path: SAMPLE_ONLY)
+    row = _row("ca-app-pub-3940256099942544/1033173712")
+    apk_verifier._apply_ad_id_rows([row], "x.apk")
+    assert row["found"] is True
+    assert row["note"] == apk_verifier.AD_ID_IN_APK_NOTE

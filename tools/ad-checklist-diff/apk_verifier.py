@@ -18,6 +18,15 @@ An APK match is weaker evidence than a log match and is labelled as such: it
 proves the build contains the ID, not that the screen in question is enabled or
 wired to it. A row already confirmed in the log is never re-judged here.
 
+Gap 2 rests on an assumption that is not always true: that the build compiles in
+its real ad unit IDs. Apps that fetch IDs from remote config at runtime ship an
+APK containing only the AdMob SDK's own sample IDs, and there "absent from the
+APK" is the normal state of every real ID -- it says nothing about the checklist.
+A run against such a build put all 44 of its ad-ID rows into "không có trong
+build" with a note suspecting the checklist, while the log showed the app loading
+production IDs the APK had never heard of. So the sweep now checks whether it is
+in a position to answer at all before it answers.
+
 Reading the manifest needs `aapt2` (Android SDK build-tools); ad unit IDs need
 no extra tooling. When something is unavailable the affected rows are marked
 explicitly unverified rather than silently passed or failed.
@@ -54,6 +63,32 @@ AD_ID_NOT_IN_APK_NOTE = (
     "Không tìm thấy ID này trong APK của build đang cài -- nghi checklist ghi ID "
     "không tồn tại trong build (không phải chỉ do chưa capture đúng màn)."
 )
+AD_ID_APK_CANNOT_ANSWER_NOTE = (
+    "APK của build này không nhúng ID ads thật nào (chỉ có ID mẫu của SDK), nên "
+    "việc không thấy ID trong APK KHÔNG nói lên điều gì -- app nạp ad unit ID "
+    "lúc chạy. Dòng này phải đối chiếu bằng log, cần capture đúng màn."
+)
+
+# Publisher ids that are nobody's real inventory: Google's own sample ads, which
+# ship inside the AdMob SDK, and the placeholder a project starts life with.
+SAMPLE_PUBLISHERS = ("3940256099942544", "0000000000000000")
+
+
+def is_sample_ad_id(value: str) -> bool:
+    """An SDK sample or placeholder id rather than anyone's real placement."""
+    return any(f"ca-app-pub-{pub}" in value for pub in SAMPLE_PUBLISHERS)
+
+
+def scan_can_answer(in_apk: set[str]) -> bool:
+    """Whether absence from this APK is evidence about an ad unit id.
+
+    Only when the build embeds at least one real ad unit id. A build carrying
+    nothing but sample ids keeps its real ones somewhere else -- remote config --
+    so every real id is "absent" and absence distinguishes nothing.
+    """
+    return any(
+        AD_UNIT_ID_RE.fullmatch(value) and not is_sample_ad_id(value) for value in in_apk
+    )
 
 
 def is_app_id(value: str) -> bool:
@@ -162,10 +197,14 @@ def _apply_ad_id_rows(rows: list[dict], apk_path: str) -> None:
         in_apk = apk_ad_ids(apk_path)
     except (zipfile.BadZipFile, OSError):
         return
+    # Decided once for the build, not per row: it is a fact about the APK.
+    can_answer = scan_can_answer(in_apk)
     for row in rows:
         if any(ad_id in in_apk for ad_id in _row_ad_ids(row)):
             row["found"] = True
             row["note"] = AD_ID_IN_APK_NOTE
+        elif not can_answer:
+            row["note"] = AD_ID_APK_CANNOT_ANSWER_NOTE
         else:
             row["note"] = AD_ID_NOT_IN_APK_NOTE
 
