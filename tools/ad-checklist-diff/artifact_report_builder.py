@@ -64,8 +64,11 @@ def _section_html(index: int, name: str, rows: list[dict]) -> str:
     matched = sum(1 for r in rows if r["found"])
     frac_class = "frac--ok" if matched == len(rows) else "frac--miss"
     body = "".join(_row_html(r) for r in rows)
+    # Chỉ mở sẵn section còn dòng lệch. Section khớp hết là dữ liệu tra cứu --
+    # mở hết ra thì phần điều tra bị đẩy xuống dưới hàng chục dòng đều Khớp.
+    opened = " open" if matched < len(rows) else ""
     return (
-        f'<details class="sec" id="sec{index}" open>'
+        f'<details class="sec" id="sec{index}"{opened}>'
         f'<summary><span class="sec-name">{html.escape(name)}</span>'
         f'<span class="sec-frac {frac_class}">{matched}/{len(rows)} khớp</span></summary>'
         f'<div class="tbl-scroll"><table>'
@@ -133,6 +136,9 @@ def render(
         "MATCHED": str(matched),
         "MISSED": str(total - matched),
         "LEFTOVER_N": str(len(leftover)),
+        # Thanh tỉ lệ khớp/lệch trên đầu trang. Một dòng lệch giữa 72 dòng nhìn
+        # ra ngay là một vạch mỏng, thay vì phải tự chia hai con số.
+        "MATCH_PCT": f"{(matched / total * 100) if total else 0:.4g}",
         "CHIPS": "".join(chips),
         "TABLES": "".join(tables),
         "LEFTOVER": _leftover_html(leftover, highlight),
@@ -179,7 +185,7 @@ def main() -> None:
     parser.add_argument("--snapshots", default=str(HERE / "snapshots"))
     parser.add_argument("--registry", default=str(HERE / "apps.json"))
     parser.add_argument("--findings", help="HTML fragment: this run's fan-out findings")
-    parser.add_argument("--notes", help="HTML fragment: ghi chú + câu hỏi chưa giải quyết")
+    parser.add_argument("--notes", help="HTML fragment: việc cần làm (thường một câu cho ads-team)")
     parser.add_argument("--highlight", nargs="*", default=[], help="leftover IDs the findings explain")
     parser.add_argument("--run", default="", help="ID lượt workflow, ví dụ wf_8f6c22cc-5a6")
     parser.add_argument("--mode", default="", choices=["", "capture", "apk", "skip"])

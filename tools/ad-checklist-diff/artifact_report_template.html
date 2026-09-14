@@ -4,32 +4,41 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
 <style>
   :root {
-    --paper:#f5f7f7; --surface:#ffffff; --ink:#141a1c; --ink-soft:#4c5a5e; --ink-faint:#7d8b8f;
-    --rule:#d8e0e1; --rule-soft:#e7edee; --accent:#0e7490; --accent-ink:#0a5c74;
-    --miss:#ad2b22; --miss-bg:#fbeceb; --hit:#1f6b4c; --hit-bg:#e8f3ed;
-    --warn:#8a5a00; --warn-bg:#f9f0dd;
+    --paper:#f1f5f9; --surface:#ffffff; --sunk:#e8eef4;
+    --ink:#0f172a; --ink-soft:#475569; --ink-faint:#7c8ca0;
+    --rule:#cfdae6; --rule-soft:#e3eaf2;
+    --accent:#4f46e5; --accent-ink:#4338ca; --accent-wash:#eef0fe;
+    --hit:#059669; --hit-bg:#e3f6ee;
+    --miss:#e11d48; --miss-bg:#fdeaef;
+    --warn:#c2740a; --warn-bg:#fcf1dd;
     --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
     --sans:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
     --serif:"IBM Plex Serif",Georgia,serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --paper:#0e1416; --surface:#151d20; --ink:#e6edee; --ink-soft:#a3b3b7; --ink-faint:#71858a;
-      --rule:#2a373b; --rule-soft:#1e292c; --accent:#3fb6cf; --accent-ink:#7fd4e6;
-      --miss:#f08078; --miss-bg:#2c1917; --hit:#6cc79b; --hit-bg:#142620;
-      --warn:#d7a63f; --warn-bg:#2a2315;
+      --paper:#0b1220; --surface:#131c2e; --sunk:#0f1728;
+      --ink:#e8eef7; --ink-soft:#a5b4c8; --ink-faint:#75879e;
+      --rule:#2c3a52; --rule-soft:#1d2840;
+      --accent:#818cf8; --accent-ink:#a5b4fc; --accent-wash:#1c2344;
+      --hit:#34d399; --hit-bg:#0e2b22;
+      --miss:#fb7185; --miss-bg:#341520;
+      --warn:#fbbf24; --warn-bg:#2e2411;
     }
   }
   :root[data-theme="dark"] {
-    --paper:#0e1416; --surface:#151d20; --ink:#e6edee; --ink-soft:#a3b3b7; --ink-faint:#71858a;
-    --rule:#2a373b; --rule-soft:#1e292c; --accent:#3fb6cf; --accent-ink:#7fd4e6;
-    --miss:#f08078; --miss-bg:#2c1917; --hit:#6cc79b; --hit-bg:#142620;
-    --warn:#d7a63f; --warn-bg:#2a2315;
+    --paper:#0b1220; --surface:#131c2e; --sunk:#0f1728;
+    --ink:#e8eef7; --ink-soft:#a5b4c8; --ink-faint:#75879e;
+    --rule:#2c3a52; --rule-soft:#1d2840;
+    --accent:#818cf8; --accent-ink:#a5b4fc; --accent-wash:#1c2344;
+    --hit:#34d399; --hit-bg:#0e2b22;
+    --miss:#fb7185; --miss-bg:#341520;
+    --warn:#fbbf24; --warn-bg:#2e2411;
   }
 
   body { background:var(--paper); color:var(--ink); font-family:var(--serif); font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased; }
-  .wrap { max-width:900px; margin-inline:auto; padding-inline:22px; padding-block:44px 88px; display:flex; flex-direction:column; gap:46px; }
-  h1,h2,h3 { font-family:var(--sans); font-weight:600; text-wrap:balance; margin:0; line-height:1.2; }
+  .wrap { max-width:900px; margin-inline:auto; padding-inline:22px; padding-block:40px 84px; display:flex; flex-direction:column; gap:44px; }
+  h1,h2,h3,h4 { font-family:var(--sans); font-weight:600; text-wrap:balance; margin:0; line-height:1.2; }
   p { margin:0; }
   a { color:var(--accent-ink); }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
@@ -39,37 +48,64 @@
   /* masthead */
   .masthead { display:flex; flex-direction:column; gap:13px; }
   .masthead h1 { font-size:clamp(29px,5.6vw,42px); letter-spacing:-.015em; }
+  .accent-rule { height:4px; background:linear-gradient(90deg,var(--accent),var(--hit)); }
   .pkg { font-family:var(--mono); font-size:13px; color:var(--ink-soft); overflow-wrap:anywhere; }
   .runmeta { display:flex; flex-wrap:wrap; gap:6px 20px; font-family:var(--mono); font-size:12px; color:var(--ink-faint); border-top:1px solid var(--rule); padding-top:12px; }
   .runmeta b { color:var(--ink-soft); font-weight:500; }
 
   /* scoreboard */
-  .score { display:flex; flex-direction:column; gap:18px; }
+  .score { display:flex; flex-direction:column; gap:16px; }
   .score-top { display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 30px; }
   .bigfrac { font-family:var(--mono); font-weight:600; letter-spacing:-.03em; font-variant-numeric:tabular-nums; line-height:.92; }
   .bigfrac .n { font-size:clamp(54px,13vw,86px); color:var(--hit); }
   .bigfrac .d { font-size:clamp(26px,6vw,40px); color:var(--ink-faint); }
   .score-lede { font-size:16px; color:var(--ink-soft); max-width:40ch; flex:1 1 260px; }
   .score-lede b { color:var(--miss); font-family:var(--sans); font-weight:700; }
+  .meter { display:flex; height:10px; background:var(--miss); border:1px solid var(--rule); overflow:hidden; }
+  .meter-hit { background:var(--hit); border-right:2px solid var(--surface); }
+  .meter-key { display:flex; flex-wrap:wrap; gap:6px 18px; font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); }
+  .meter-key span { display:flex; align-items:center; gap:6px; }
+  .swatch { width:9px; height:9px; flex:none; }
+  .sw--hit { background:var(--hit); }
+  .sw--miss { background:var(--miss); }
   .statchips { display:flex; flex-wrap:wrap; gap:8px; }
   .statchip { display:flex; align-items:baseline; gap:9px; padding:7px 12px; border:1px solid var(--rule); background:var(--surface); text-decoration:none; color:inherit; }
   .statchip-name { font-family:var(--sans); font-size:14px; font-weight:600; }
   .statchip-frac { font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums; }
-  .chip--ok .statchip-frac { color:var(--hit); }
+  .chip--ok { border-color:var(--hit); background:var(--hit-bg); }
+  .chip--ok .statchip-frac { color:var(--hit); font-weight:600; }
   .chip--miss { border-color:var(--miss); background:var(--miss-bg); }
   .chip--miss .statchip-frac { color:var(--miss); font-weight:600; }
 
   /* sections */
   section { display:flex; flex-direction:column; gap:16px; }
-  section > h2 { font-size:13px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-ink); border-bottom:1px solid var(--rule); padding-bottom:8px; }
+  section > h2 { font-size:13px; letter-spacing:.13em; text-transform:uppercase; color:var(--accent-ink); border-bottom:2px solid var(--accent); padding-bottom:8px; }
   .prose { max-width:64ch; }
+  .ref-note { font-size:14px; color:var(--ink-faint); max-width:64ch; }
+
+  /* the investigation -- headings come from the fragment, so style them here */
+  .probe { display:flex; flex-direction:column; gap:15px; }
+  .probe > h2 { font-family:var(--sans); font-size:clamp(21px,3.4vw,27px); letter-spacing:-.01em; border-left:4px solid var(--miss); padding-left:13px; }
+  .probe > h3 { font-size:20px; }
+  .probe > h4 { font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-ink); margin-top:7px; }
+  .probe p, .probe li { max-width:66ch; }
+  .probe ul { margin:0; padding-left:20px; display:flex; flex-direction:column; gap:7px; }
+  .probe code { font-family:var(--mono); font-size:13px; overflow-wrap:anywhere; }
+  .probe table { border-collapse:collapse; width:100%; font-size:14.5px; background:var(--surface); border:1px solid var(--rule); }
+  .probe th { font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; text-align:left; padding:10px 14px; border-bottom:1px solid var(--rule); }
+  .probe td { padding:10px 14px; border-bottom:1px solid var(--rule-soft); vertical-align:top; color:var(--ink-soft); }
+  .probe tbody tr:last-child td { border-bottom:none; }
+  .probe .note { font-size:14.5px; color:var(--ink-faint); border-left:2px solid var(--rule); padding-left:12px; }
+  .verdict-confirmed { border-left:4px solid var(--hit); background:var(--hit-bg); padding:13px 16px; font-size:15.5px; color:var(--ink-soft); }
 
   /* checklist tables */
   .sec { border:1px solid var(--rule); background:var(--surface); }
   .sec + .sec { border-top:none; }
   .sec > summary { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 14px; padding:13px 16px; cursor:pointer; font-family:var(--sans); list-style:none; }
   .sec > summary::-webkit-details-marker { display:none; }
-  .sec-name { font-weight:600; font-size:17px; }
+  .sec > summary::before { content:"▸"; color:var(--ink-faint); font-size:12px; margin-right:2px; }
+  .sec[open] > summary::before { content:"▾"; }
+  .sec-name { font-weight:600; font-size:17px; margin-right:auto; }
   .sec-frac { font-family:var(--mono); font-size:12.5px; font-variant-numeric:tabular-nums; }
   .frac--ok { color:var(--hit); }
   .frac--miss { color:var(--miss); font-weight:600; }
@@ -100,10 +136,13 @@
   .duel { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--rule); border:1px solid var(--rule); }
   .side { background:var(--surface); padding:20px; display:flex; flex-direction:column; gap:12px; }
   .side > .eyebrow { color:var(--ink-soft); }
+  .side p { font-size:14.5px; color:var(--ink-soft); }
   .idblock { font-family:var(--mono); overflow-wrap:anywhere; }
   .idblock .prefix { display:block; font-size:12px; color:var(--ink-faint); }
   .idblock .tail { font-size:clamp(22px,5.2vw,30px); font-weight:600; letter-spacing:-.02em; }
+  .side--sheet { background:var(--miss-bg); }
   .side--sheet .tail { color:var(--miss); text-decoration:line-through; text-decoration-thickness:2px; }
+  .side--build { background:var(--hit-bg); }
   .side--build .tail { color:var(--hit); }
   .counts { display:flex; flex-direction:column; gap:4px; font-family:var(--mono); font-size:12.5px; }
   .counts div { display:flex; justify-content:space-between; gap:12px; border-top:1px dotted var(--rule); padding-top:4px; color:var(--ink-soft); }
@@ -145,11 +184,13 @@
   .callout p { max-width:62ch; font-size:15.5px; }
   .callout q { font-style:italic; }
 
-  .notes { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; }
-  .notes li { padding-left:18px; position:relative; max-width:64ch; font-size:15.5px; color:var(--ink-soft); }
-  .notes li::before { content:"—"; position:absolute; left:0; color:var(--ink-faint); }
+  .notes { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
+  .notes li { padding:9px 12px; background:var(--surface); border-left:3px solid var(--accent); font-family:var(--mono); font-size:13px; color:var(--ink-soft); overflow-wrap:anywhere; }
   .tag { font-family:var(--mono); font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--miss); border:1px solid currentColor; padding:1px 6px; margin-left:6px; white-space:nowrap; }
   .tag--mute { color:var(--ink-faint); }
+
+  .closing { display:flex; flex-direction:column; gap:13px; }
+  .closing p { max-width:66ch; font-size:15.5px; color:var(--ink-soft); }
 
   .colophon { border-top:1px solid var(--rule); padding-top:16px; font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); display:flex; flex-direction:column; gap:4px; overflow-wrap:anywhere; }
 
@@ -161,6 +202,7 @@
   <header class="masthead">
     <div class="eyebrow">Ad checklist diff + audit fan-out · {{RUN}}</div>
     <h1>Đối chiếu ads — {{TITLE}}</h1>
+    <div class="accent-rule"></div>
     <div class="pkg">{{PKG}} · versionCode {{VC}}</div>
     <div class="runmeta">
       <span>audit <b>{{AUDITED_AT}}</b></span>
@@ -176,22 +218,30 @@
       <div class="bigfrac"><span class="n">{{MATCHED}}</span><span class="d">/{{TOTAL}}</span></div>
       <p class="score-lede">dòng checklist khớp build. <b>{{MISSED}} dòng lệch</b>, đã điều tra tới cùng ở dưới. Ngoài ra {{LEFTOVER_N}} ID xuất hiện trong build mà sheet không có.</p>
     </div>
+    <div class="meter" role="img" aria-label="{{MATCHED}} trên {{TOTAL}} dòng khớp, {{MISSED}} dòng lệch">
+      <span class="meter-hit" style="width:{{MATCH_PCT}}%"></span>
+    </div>
+    <div class="meter-key">
+      <span><i class="swatch sw--hit"></i>{{MATCHED}} khớp</span>
+      <span><i class="swatch sw--miss"></i>{{MISSED}} lệch</span>
+    </div>
     <div class="statchips">{{CHIPS}}</div>
   </div>
 
-  <section>
-    <h2>Bảng đối chiếu</h2>
-    <div>{{TABLES}}</div>
-  </section>
-
-  {{FINDINGS}}
+  <div class="probe">{{FINDINGS}}</div>
 
   <section>
     <h2>ID có trong build, không có trong sheet</h2>
     <ul class="notes">{{LEFTOVER}}</ul>
   </section>
 
-  {{NOTES}}
+  <section>
+    <h2>Bảng đối chiếu đầy đủ</h2>
+    <p class="ref-note">Dữ liệu tra cứu. Mục nào còn dòng lệch thì mở sẵn; mục khớp hết thì gấp lại, bấm để xem.</p>
+    <div>{{TABLES}}</div>
+  </section>
+
+  <div class="closing">{{NOTES}}</div>
 
   <footer class="colophon">
     <span>Nguồn: snapshots/{{PKG}}.json · out/…-triage.json · out/…-capture.log · .cache/ad-checklist-diff/…-{{VC}}.apk</span>
