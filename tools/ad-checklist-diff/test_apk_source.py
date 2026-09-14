@@ -116,3 +116,67 @@ def test_cacheable_pull_lands_on_the_cache_filesystem(tmp_path, monkeypatch):
 
     assert seen and os.path.dirname(seen[0]) == str(cache)
     assert path == str(cache / "com.example.app-7.apk")
+
+
+# --- A split build is more than base.apk --------------------------------
+# An app bundle keeps most of its code in splits, so a string compiled into one
+# is absent from base. Scanning base alone reports it as missing from a build
+# that ships it -- the one answer this tool must never get wrong.
+
+def _apk(path, *entries):
+    import zipfile
+    with zipfile.ZipFile(path, "w") as zf:
+        for name, blob in entries:
+            zf.writestr(name, blob)
+    return str(path)
+
+
+def test_a_string_only_in_a_split_is_still_found(tmp_path):
+    base = _apk(tmp_path / "base.apk", ("classes.dex", b"nothing here"))
+    split = _apk(tmp_path / "split_a.apk", ("classes2.dex", b"x 305_onb5 y"))
+    hits = apk_source.apk_contains([base, split], ["305_onb5"])
+    assert hits["305_onb5"], "string in a split read as absent from the build"
+    # With several APKs the hit says which one, so a reader can tell where it lives.
+    assert hits["305_onb5"][0].startswith("split_a.apk/")
+
+
+def test_one_apk_keeps_the_bare_entry_name(tmp_path):
+    base = _apk(tmp_path / "base.apk", ("classes.dex", b"305_onb5"))
+    assert apk_source.apk_contains([base], ["305_onb5"])["305_onb5"] == ["classes.dex"]
+    # A bare path is accepted too -- callers hold whichever the build turned out to be.
+    assert apk_source.apk_contains(base, ["305_onb5"])["305_onb5"] == ["classes.dex"]
+
+
+def test_ad_ids_are_collected_across_splits(tmp_path):
+    base = _apk(tmp_path / "base.apk", ("classes.dex", b"ca-app-pub-111/222"))
+    split = _apk(tmp_path / "split_a.apk", ("classes2.dex", b"ca-app-pub-333/444"))
+    assert apk_source.apk_ad_ids([base, split]) == {
+        "ca-app-pub-111/222",
+        "ca-app-pub-333/444",
+    }
+
+
+def test_base_is_offered_first(monkeypatch):
+    # The manifest is read from base, so its position in the list is a contract.
+    monkeypatch.setattr(
+        apk_source.subprocess,
+        "run",
+        lambda *a, **k: type("P", (), {"stdout": "package:/d/split_a.apk\npackage:/d/base.apk\n"})(),
+    )
+    assert apk_source.device_apk_paths("com.x")[0].endswith("base.apk")
+
+
+def test_splits_of_the_installed_build_survive_pruning(tmp_path, monkeypatch):
+    # Pruning keys on the build, not the filename: dropping this build's splits
+    # while keeping its base would make every later scan silently partial.
+    monkeypatch.setattr(apk_source, "CACHE_DIR", str(tmp_path))
+    keep_base = tmp_path / "com.x-12.apk"
+    keep_split = tmp_path / "com.x-12-split1.apk"
+    stale = tmp_path / "com.x-11.apk"
+    for f in (keep_base, keep_split, stale):
+        f.write_bytes(b"x")
+
+    apk_source._prune_older_cached_builds("com.x", "12")
+
+    assert keep_base.exists() and keep_split.exists()
+    assert not stale.exists()

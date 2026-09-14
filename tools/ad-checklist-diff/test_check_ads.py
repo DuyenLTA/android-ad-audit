@@ -372,3 +372,48 @@ def test_diff_note_truncates_long_candidate_lists():
     assert note.startswith("ID checklist: inter_feature_high (lệch)")
     assert "ID lệch thấy trong log" in note
     assert "(+3 khác)" in note
+
+
+# --- A setting reaches the log under more than one name --------------------
+
+def test_a_row_is_told_what_the_log_shows_under_the_other_name():
+    # The regression: a build without the tester dump only prints
+    # `Application: setupAdjust: sandbox`, whose label is the method name, so a
+    # row reading `production` fell through to "không thấy ID lệch nào tương
+    # ứng trong log" -- while the contradicting value sat in the same file. The
+    # row then got judged a checklist error rather than a build one.
+    note = check_ads._mismatch_note(
+        {"label": "Adjust config environment", "value": "production"},
+        {"setupAdjust": "sandbox"},
+        {},
+        [],
+    )
+    assert "sandbox" in note
+    assert "không thấy" not in note
+
+
+def test_the_label_as_written_still_wins_over_its_alias():
+    note = check_ads._mismatch_note(
+        {"label": "Adjust config environment", "value": "production"},
+        {"Adjust config environment": "staging", "setupAdjust": "sandbox"},
+        {},
+        [],
+    )
+    assert "staging" in note
+
+
+def test_a_matching_value_under_an_alias_is_not_reported_as_a_difference():
+    note = check_ads._mismatch_note(
+        {"label": "Adjust config environment", "value": "production"},
+        {"setupAdjust": "production"},
+        {},
+        [],
+    )
+    assert "không thấy" in note
+
+
+def test_a_label_with_no_alias_is_unaffected():
+    note = check_ads._mismatch_note(
+        {"label": "Facebook App ID", "value": "123"}, {"setupAdjust": "sandbox"}, {}, []
+    )
+    assert "sandbox" not in note

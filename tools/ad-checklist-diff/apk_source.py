@@ -52,15 +52,31 @@ def find_aapt2() -> str | None:
     return which("aapt2")
 
 
-def device_apk_path(package: str) -> str | None:
-    """Path of the installed base APK on the device, per `pm path`."""
+def device_apk_paths(package: str) -> list[str]:
+    """Every APK of the installed build: base first, then its splits.
+
+    An app delivered as an app bundle keeps most of its code in split APKs, and
+    a string compiled into one of those is absent from base.apk. Scanning only
+    base therefore reports "không có trong build" for placements the build
+    really ships. Plenty of apps on a normal phone are split this way.
+    """
     out = subprocess.run(
         ["adb", "shell", "pm", "path", package], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20
     ).stdout
-    for line in out.splitlines():
-        line = line.strip()
-        if line.startswith("package:") and line.endswith("base.apk"):
-            return line[len("package:"):]
+    paths = [
+        line.strip()[len("package:"):]
+        for line in out.splitlines()
+        if line.strip().startswith("package:")
+    ]
+    # Base first: it is the one the manifest is read from.
+    return sorted(paths, key=lambda p: not p.endswith("base.apk"))
+
+
+def device_apk_path(package: str) -> str | None:
+    """Path of the installed base APK on the device, per `pm path`."""
+    for path in device_apk_paths(package):
+        if path.endswith("base.apk"):
+            return path
     return None
 
 
@@ -76,36 +92,39 @@ def device_version_code(package: str) -> str | None:
     return m.group(1) if m else None
 
 
-def cache_path(package: str, version_code: str) -> str:
-    return os.path.join(CACHE_DIR, f"{package}-{version_code}.apk")
+def cache_path(package: str, version_code: str, split: str | None = None) -> str:
+    """Where a pulled APK lives. `split` names a non-base APK of the same build.
+
+    Base keeps the historic name, so caches pulled before splits were handled
+    are still found instead of being silently re-pulled.
+    """
+    stem = f"{package}-{version_code}"
+    if split:
+        stem += f"-{split}"
+    return os.path.join(CACHE_DIR, f"{stem}.apk")
 
 
 def _prune_older_cached_builds(package: str, keep: str) -> None:
     """Drop cached APKs of superseded builds -- only the installed one is useful."""
+    keep_prefix = os.path.join(CACHE_DIR, f"{package}-{keep}")
     for stale in glob.glob(os.path.join(CACHE_DIR, f"{package}-*.apk")):
-        if stale != cache_path(package, keep):
+        # Every APK of the installed build shares this prefix: base is
+        # "<pkg>-<vc>.apk" and its splits "<pkg>-<vc>-<split>.apk".
+        if not stale.startswith(keep_prefix):
             try:
                 os.unlink(stale)
             except OSError:
                 pass
 
 
-def base_apk(package: str) -> tuple[str | None, bool]:
-    """Local copy of the installed base APK, cached per build.
-
-    Returns (path, ephemeral): ephemeral means the caller must delete the file,
-    which happens only when the build's versionCode could not be read and the
-    copy therefore cannot be keyed for reuse.
-    """
-    version_code = device_version_code(package)
+def _pull_apk(
+    package: str, remote_path: str, version_code: str | None, split: str | None = None
+) -> tuple[str | None, bool]:
+    """Fetch one APK off the device, cached per build when that is possible."""
     if version_code:
-        cached = cache_path(package, version_code)
+        cached = cache_path(package, version_code, split)
         if os.path.exists(cached) and zipfile.is_zipfile(cached):
             return cached, False
-
-    apk_path = device_apk_path(package)
-    if not apk_path:
-        return None, False
 
     # Pull into a temp file *inside* the cache dir when the result is
     # cacheable: os.replace cannot rename across filesystems, and the system
@@ -117,7 +136,7 @@ def base_apk(package: str) -> tuple[str | None, bool]:
         fd, local_apk = tempfile.mkstemp(suffix=".apk", prefix="adcheck_apk_")
     os.close(fd)
     pull = subprocess.run(
-        ["adb", "pull", apk_path, local_apk], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600
+        ["adb", "pull", remote_path, local_apk], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600
     )
     if pull.returncode != 0:
         os.unlink(local_apk)
@@ -127,10 +146,61 @@ def base_apk(package: str) -> tuple[str | None, bool]:
 
     # Move into place only once the pull finished, so an interrupted pull can
     # never leave a truncated APK behind as a valid-looking cache entry.
-    cached = cache_path(package, version_code)
+    cached = cache_path(package, version_code, split)
     os.replace(local_apk, cached)
     _prune_older_cached_builds(package, version_code)
     return cached, False
+
+
+def base_apk(package: str) -> tuple[str | None, bool]:
+    """Local copy of the installed base APK, cached per build.
+
+    Returns (path, ephemeral): ephemeral means the caller must delete the file,
+    which happens only when the build's versionCode could not be read and the
+    copy therefore cannot be keyed for reuse.
+    """
+    version_code = device_version_code(package)
+    apk_path = device_apk_path(package)
+    if not apk_path:
+        # No path means no device or no install -- but a cache entry from an
+        # earlier run is still a usable copy of that build.
+        if version_code:
+            cached = cache_path(package, version_code)
+            if os.path.exists(cached) and zipfile.is_zipfile(cached):
+                return cached, False
+        return None, False
+    return _pull_apk(package, apk_path, version_code)
+
+
+def build_apks(package: str) -> tuple[list[str], bool]:
+    """Local copies of every APK of the installed build, base first.
+
+    Same contract as `base_apk`, for the whole build rather than one file:
+    (paths, ephemeral), ephemeral meaning the caller deletes them because the
+    versionCode could not be read and the copies cannot be keyed for reuse.
+
+    A split build keeps most of its code outside base.apk, so a scan of base
+    alone reports strings as absent from a build that ships them.
+    """
+    remote = device_apk_paths(package)
+    if not remote:
+        return [], False
+    if len(remote) == 1:
+        path, ephemeral = base_apk(package)
+        return ([path], ephemeral) if path else ([], False)
+
+    version_code = device_version_code(package)
+    paths, ephemeral = [], False
+    for index, remote_path in enumerate(remote):
+        # Index rather than the on-device filename: split names are stable
+        # enough to read but not guaranteed unique across the list.
+        split = None if index == 0 else f"split{index}"
+        local, one_ephemeral = _pull_apk(package, remote_path, version_code, split)
+        if not local:
+            continue
+        paths.append(local)
+        ephemeral = ephemeral or one_ephemeral
+    return paths, ephemeral
 
 
 def manifest_app_id(apk_path: str, aapt2: str) -> str | None:
@@ -163,7 +233,12 @@ def app_id_from_xmltree(xmltree: str) -> str | None:
     return None
 
 
-def apk_contains(apk_path: str, needles: list[str]) -> dict[str, list[str]]:
+def _as_paths(apk_path) -> list[str]:
+    """One APK or several -- callers hold whichever the build turned out to be."""
+    return [apk_path] if isinstance(apk_path, (str, os.PathLike)) else list(apk_path)
+
+
+def apk_contains(apk_path, needles: list[str]) -> dict[str, list[str]]:
     """Which APK entries hold each literal string. Empty list means absent.
 
     The agent layer kept re-implementing this by hand and kept getting it half
@@ -176,24 +251,34 @@ def apk_contains(apk_path: str, needles: list[str]) -> dict[str, list[str]]:
         for needle in needles
     ]
     hits: dict[str, list[str]] = {needle: [] for needle in needles}
-    with zipfile.ZipFile(apk_path) as zf:
-        for info in zf.infolist():
-            with zf.open(info) as entry:
-                blob = entry.read()
-            for needle, utf8, utf16 in wanted:
-                if utf8 in blob or utf16 in blob:
-                    hits[needle].append(info.filename)
+    paths = _as_paths(apk_path)
+    for path in paths:
+        # Name the split a hit came from, but only when there is more than one
+        # APK -- otherwise every line grows a "base.apk/" nobody needs.
+        prefix = "" if len(paths) == 1 else f"{os.path.basename(path)}/"
+        with zipfile.ZipFile(path) as zf:
+            for info in zf.infolist():
+                with zf.open(info) as entry:
+                    blob = entry.read()
+                for needle, utf8, utf16 in wanted:
+                    if utf8 in blob or utf16 in blob:
+                        hits[needle].append(f"{prefix}{info.filename}")
     return hits
 
 
-def apk_ad_ids(apk_path: str) -> set[str]:
-    """Every AdMob ID string compiled into the APK (dex, resources, assets)."""
+def apk_ad_ids(apk_path) -> set[str]:
+    """Every AdMob ID string compiled into the build (dex, resources, assets).
+
+    Takes one APK or the whole set: a split build keeps most of its code outside
+    base.apk, so reading base alone under-reports what the build contains.
+    """
     ids: set[str] = set()
-    with zipfile.ZipFile(apk_path) as zf:
-        for info in zf.infolist():
-            if not info.filename.endswith(SCANNED_SUFFIXES):
-                continue
-            with zf.open(info) as entry:
-                blob = entry.read()
-            ids.update(m.decode("ascii") for m in APK_ID_BYTES_RE.findall(blob))
+    for path in _as_paths(apk_path):
+        with zipfile.ZipFile(path) as zf:
+            for info in zf.infolist():
+                if not info.filename.endswith(SCANNED_SUFFIXES):
+                    continue
+                with zf.open(info) as entry:
+                    blob = entry.read()
+                ids.update(m.decode("ascii") for m in APK_ID_BYTES_RE.findall(blob))
     return ids

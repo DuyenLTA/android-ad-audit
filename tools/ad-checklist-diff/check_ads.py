@@ -96,6 +96,27 @@ def _cooccurrence_candidates(
     return {value: sorted(keys - claimed) for value, keys in candidates.items() if keys - claimed}
 
 
+# The same setting reaches the log under more than one name. A checklist row is
+# written the way the sheet words it; the app prints whatever its own code calls
+# the field. "Adjust config environment" is logged verbatim by the tester dump,
+# but a build without that dump only ever prints `Application: setupAdjust:
+# sandbox`, whose label is the method name. Without the alias the row falls
+# through to "không thấy ID lệch nào tương ứng trong log" while the contradicting
+# value sits two lines away in the same file -- which is how a row reading
+# `production` against a build running sandbox got labelled a checklist error.
+LABEL_ALIASES = {
+    "Adjust config environment": ("setupAdjust",),
+}
+
+
+def logged_value(label: str, label_value_pairs: dict) -> str | None:
+    """What the log shows for this checklist label, under any name it uses."""
+    for name in (label, *LABEL_ALIASES.get(label, ())):
+        if name in label_value_pairs:
+            return label_value_pairs[name]
+    return None
+
+
 def _mismatch_note(
     row: dict,
     label_value_pairs: dict,
@@ -117,8 +138,9 @@ def _mismatch_note(
     whole run instead (diff()'s "leftover_ids").
     """
     label, value = row["label"], row["value"]
-    if label in label_value_pairs and label_value_pairs[label] != value:
-        return f"ID checklist: {value} (lệch) -- ID lệch thấy trong log: {label_value_pairs[label]}"
+    logged = logged_value(label, label_value_pairs)
+    if logged is not None and logged != value:
+        return f"ID checklist: {value} (lệch) -- ID lệch thấy trong log: {logged}"
     for key in (value, f"{SHOW_PREFIX}{value}"):
         if key in key_value_pairs and key_value_pairs[key].lower() != "true":
             return (

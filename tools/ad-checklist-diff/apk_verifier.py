@@ -38,7 +38,7 @@ import re
 import subprocess
 import zipfile
 
-from apk_source import apk_ad_ids, apk_contains, base_apk, find_aapt2, manifest_app_id
+from apk_source import apk_ad_ids, apk_contains, build_apks, find_aapt2, manifest_app_id
 
 APP_ID_RE = re.compile(r"ca-app-pub-\d+~\d+")
 AD_UNIT_ID_RE = re.compile(r"ca-app-pub-\d+/\d+")
@@ -127,7 +127,7 @@ def is_token_like(value: str) -> bool:
     return (has_alpha and has_digit) or (value.isdigit() and len(value) >= 12)
 
 
-def verify_apk_rows(result: dict, package: str | None, apk_fn=base_apk) -> None:
+def verify_apk_rows(result: dict, package: str | None, apk_fn=build_apks) -> None:
     """Second-opinion unmatched App ID / ad unit ID rows against the APK, in place.
 
     Rows the log already confirmed keep their log verdict -- observing an ad
@@ -153,21 +153,24 @@ def verify_apk_rows(result: dict, package: str | None, apk_fn=base_apk) -> None:
         return
 
     try:
-        apk_path, ephemeral = apk_fn(package)
+        apk_paths, ephemeral = apk_fn(package)
     except (subprocess.SubprocessError, OSError):
-        apk_path, ephemeral = None, False
-    if not apk_path:
+        apk_paths, ephemeral = [], False
+    if not apk_paths:
         for row in app_id_rows:
             row["note"] = APP_ID_UNVERIFIED_NOTE
         return
 
     try:
-        _apply_app_id_rows(app_id_rows, apk_path)
-        _apply_ad_id_rows(ad_id_rows, apk_path)
-        _apply_plain_rows(plain_rows, apk_path)
+        # The manifest lives in base.apk, which build_apks puts first; the
+        # string sweeps want the whole build, splits included.
+        _apply_app_id_rows(app_id_rows, apk_paths[0])
+        _apply_ad_id_rows(ad_id_rows, apk_paths)
+        _apply_plain_rows(plain_rows, apk_paths)
     finally:
         if ephemeral:
-            os.unlink(apk_path)
+            for path in apk_paths:
+                os.unlink(path)
 
 
 def _apply_app_id_rows(rows: list[dict], apk_path: str) -> None:
@@ -190,7 +193,7 @@ def _apply_app_id_rows(rows: list[dict], apk_path: str) -> None:
             row["note"] = f"Đã kiểm tra manifest APK -- app đang dùng: {declared}"
 
 
-def _apply_ad_id_rows(rows: list[dict], apk_path: str) -> None:
+def _apply_ad_id_rows(rows: list[dict], apk_path) -> None:
     if not rows:
         return
     try:
@@ -209,7 +212,7 @@ def _apply_ad_id_rows(rows: list[dict], apk_path: str) -> None:
             row["note"] = AD_ID_NOT_IN_APK_NOTE
 
 
-def _apply_plain_rows(rows: list[dict], apk_path: str) -> None:
+def _apply_plain_rows(rows: list[dict], apk_path) -> None:
     """Second-opinion plain-token rows against the APK, one sweep for all."""
     if not rows:
         return

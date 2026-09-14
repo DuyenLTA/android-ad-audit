@@ -19,21 +19,21 @@ import argparse
 import os
 import sys
 
-from apk_source import apk_contains, base_apk, cache_path, device_version_code
+from apk_source import apk_contains, build_apks, cache_path, device_version_code
 from console_encoding import use_utf8_console
 
 
-def resolve_apk(package: str) -> str:
-    """The cached APK for the installed build, pulling it only if need be."""
-    version_code = device_version_code(package)
-    if version_code:
-        cached = cache_path(package, version_code)
-        if os.path.exists(cached):
-            return cached
-    path, _ephemeral = base_apk(package)
-    if not path:
+def resolve_apks(package: str) -> list[str]:
+    """Every APK of the installed build, pulling only what is not cached.
+
+    A split build keeps most of its code outside base.apk, so answering from
+    base alone reports a string as absent from a build that ships it -- the
+    exact wrong answer this tool exists to stop being given.
+    """
+    paths, _ephemeral = build_apks(package)
+    if not paths:
         raise SystemExit(f"Không lấy được APK cho {package} (máy chưa cắm / app chưa cài)")
-    return path
+    return paths
 
 
 def main() -> None:
@@ -47,9 +47,9 @@ def main() -> None:
 
     if not args.apk and not args.package:
         raise SystemExit("Cần --package <tên package> hoặc --apk <đường dẫn>")
-    apk_path = args.apk or resolve_apk(args.package)
-    print(f"APK: {apk_path}")
-    hits = apk_contains(apk_path, args.needles)
+    apk_paths = [args.apk] if args.apk else resolve_apks(args.package)
+    print("APK: " + " + ".join(apk_paths))
+    hits = apk_contains(apk_paths, args.needles)
     for needle, entries in hits.items():
         if entries:
             shown = ", ".join(entries[:4]) + (" …" if len(entries) > 4 else "")

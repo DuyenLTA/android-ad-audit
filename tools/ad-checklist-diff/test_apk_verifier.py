@@ -60,7 +60,7 @@ def test_ad_id_row_present_in_apk_counts_as_found_with_apk_labelled_note(tmp_pat
     # exact checklist ID.
     apk = _fake_apk(tmp_path, b"ca-app-pub-111/222")
     result = _result([{"label": "Uninstall", "value": "ca-app-pub-111/222", "found": False, "note": "old"}])
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, False))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([apk], False))
     row = result["sections"]["S"][0]
     assert row["found"] is True
     assert row["note"] == AD_ID_IN_APK_NOTE
@@ -80,14 +80,14 @@ def test_ad_id_row_matches_via_sheet_column_c_alt_value(tmp_path):
             }
         ]
     )
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, False))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([apk], False))
     assert result["sections"]["S"][0]["found"] is True
 
 
 def test_ad_id_absent_from_apk_is_flagged_as_not_in_build(tmp_path):
     apk = _fake_apk(tmp_path, b"ca-app-pub-111/222")
     result = _result([{"label": "Onb4", "value": "ca-app-pub-111/777", "found": False, "note": "old"}])
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, False))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([apk], False))
     row = result["sections"]["S"][0]
     assert row["found"] is False
     assert row["note"] == AD_ID_NOT_IN_APK_NOTE
@@ -96,13 +96,13 @@ def test_ad_id_absent_from_apk_is_flagged_as_not_in_build(tmp_path):
 def test_row_already_matched_in_log_keeps_its_log_verdict(tmp_path):
     apk = _fake_apk(tmp_path, b"ca-app-pub-111/222")
     result = _result([{"label": "Home", "value": "ca-app-pub-111/999", "found": True, "note": None}])
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, False))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([apk], False))
     assert result["sections"]["S"][0]["found"] is True
 
 
 def test_unavailable_apk_marks_app_id_unverified_rather_than_wrong():
     result = _result([{"label": "App ID", "value": "ca-app-pub-111~222", "found": False, "note": "old"}])
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (None, False))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([], False))
     row = result["sections"]["S"][0]
     assert row["found"] is False
     assert row["note"] == APP_ID_UNVERIFIED_NOTE
@@ -110,7 +110,7 @@ def test_unavailable_apk_marks_app_id_unverified_rather_than_wrong():
 
 def test_no_package_in_checklist_leaves_rows_untouched():
     result = _result([{"label": "App ID", "value": "ca-app-pub-111~222", "found": False, "note": "old"}])
-    verify_apk_rows(result, None, apk_fn=lambda pkg: ("unused", False))
+    verify_apk_rows(result, None, apk_fn=lambda pkg: (["unused"], False))
     assert result["sections"]["S"][0]["note"] == "old"
 
 
@@ -119,14 +119,14 @@ def test_cached_apk_is_not_deleted_after_use(tmp_path):
     # one skips the ~45MB pull. Only an uncacheable (ephemeral) copy is removed.
     apk = _fake_apk(tmp_path, b"ca-app-pub-111/222")
     result = _result([{"label": "X", "value": "ca-app-pub-111/222", "found": False, "note": None}])
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, False))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([apk], False))
     assert os.path.exists(apk)
 
 
 def test_ephemeral_apk_is_deleted_after_use(tmp_path):
     apk = _fake_apk(tmp_path, b"ca-app-pub-111/222")
     result = _result([{"label": "X", "value": "ca-app-pub-111/222", "found": False, "note": None}])
-    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: (apk, True))
+    verify_apk_rows(result, "com.example.app", apk_fn=lambda pkg: ([apk], True))
     assert not os.path.exists(apk)
 
 
@@ -153,7 +153,7 @@ def test_a_token_compiled_into_the_build_stops_reading_as_a_mismatch(monkeypatch
         {"label": "Adjust config environment", "value": "production", "alt_values": [], "found": False, "note": None},
     ]}}
     monkeypatch.setattr(apk_verifier, "apk_contains", lambda path, needles: {n: ["classes.dex"] for n in needles})
-    apk_verifier.verify_apk_rows(result, "com.a", apk_fn=lambda pkg: (str(tmp_path / "a.apk"), False))
+    apk_verifier.verify_apk_rows(result, "com.a", apk_fn=lambda pkg: ([str(tmp_path / "a.apk")], False))
 
     token, environment = result["sections"]["S"]
     assert token["found"] is True
@@ -169,7 +169,7 @@ def test_a_token_absent_from_the_build_says_so(monkeypatch, tmp_path):
         {"label": "Adjust config token", "value": "uz6fb8kyeww0", "alt_values": [], "found": False, "note": None},
     ]}}
     monkeypatch.setattr(apk_verifier, "apk_contains", lambda path, needles: {n: [] for n in needles})
-    apk_verifier.verify_apk_rows(result, "com.a", apk_fn=lambda pkg: (str(tmp_path / "a.apk"), False))
+    apk_verifier.verify_apk_rows(result, "com.a", apk_fn=lambda pkg: ([str(tmp_path / "a.apk")], False))
 
     row = result["sections"]["S"][0]
     assert row["found"] is False
