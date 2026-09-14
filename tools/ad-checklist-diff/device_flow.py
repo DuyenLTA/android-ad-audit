@@ -11,6 +11,7 @@ Step kinds:
   {"swipe": "left"}  page a pager forward
   {"wait": n}      do nothing this step (let an ad or screen settle)
   {"key": "..."}   send a keyevent, the fallback for ad/paywall dismissal
+  {"tap_continue": True}  tap the screen's primary CTA, found by position
 
 The order below mirrors the real flow, measured on device:
 splash -> language -> onboarding (next, next, swipe, get started) -> question
@@ -19,6 +20,7 @@ splash -> language -> onboarding (next, next, swipe, get started) -> question
 from device_language_picker import DEFAULT_LANGUAGE
 from device_language_picker import pick as pick_language
 from device_close_button import find_close_center
+from device_continue_button import find_continue_center
 from device_ui import find_node_center, key_event, swipe_left, tap
 
 # Any language would reach Home, but the capture is read by people afterwards
@@ -43,14 +45,14 @@ ONBOARDING_STEPS = [
 ]
 
 # The question grid's cards carry no resource-id of their own; their inner
-# image does. Nothing advances the screen until a card is picked -- the
-# continue button is only added to the tree afterwards -- and its label depends
-# on remote config, so try the known ones in turn.
+# image does. Nothing advances the screen until a card is picked -- the continue
+# button is only added to the tree afterwards -- and its label depends on remote
+# config: "Go to Home", "Next" and "Get started" have all shipped on this same
+# button. Listing labels only ever covers the wordings already met, so the
+# button is found by where it sits instead (see device_continue_button).
 QUESTION_STEPS = [
     {"tap": {"resource_id": "id/ivQuestionImage"}},
-    {"tap": {"resource_id": "id/btnNextOnboardingImage"}},
-    {"tap": {"text": "Go to Home"}},
-    {"tap": {"text": "Next"}},
+    {"tap_continue": True},
 ]
 QUESTION_REPEAT_FROM = 1
 
@@ -135,6 +137,12 @@ def perform_step(step: dict, xml_fn, run, sleep=None) -> str | None:
             return None
         tap(*center, run=run)
         return "close"
+    if "tap_continue" in step:
+        center = find_continue_center(xml_fn())
+        if not center:
+            return None
+        tap(*center, run=run)
+        return "continue"
     if "swipe" in step:
         swipe_left(run=run)
         return "swipe"

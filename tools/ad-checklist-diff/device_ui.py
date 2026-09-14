@@ -94,6 +94,21 @@ def find_node_center(
     return None
 
 
+def screen_extent(xml: str) -> tuple[int, int]:
+    """Screen extent, taken as the furthest corner any node reaches.
+
+    Derived from the dump rather than asked of the device: the finders work on
+    a captured XML string in tests, where there is no device to ask.
+    """
+    width = height = 0
+    for node in NODE_RE.findall(xml):
+        m = BOUNDS_RE.search(node)
+        if m:
+            _x1, _y1, x2, y2 = (int(g) for g in m.groups())
+            width, height = max(width, x2), max(height, y2)
+    return width, height
+
+
 def _attr(node: str, name: str) -> str:
     m = re.search(rf'{name}="([^"]*)"', node)
     return m.group(1) if m else ""

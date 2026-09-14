@@ -21,7 +21,7 @@ later.
 Finding nothing is a useful answer: the caller falls back to BACK, which
 dismisses the ad without any chance of clicking it.
 """
-from device_ui import BOUNDS_RE, NODE_RE, _attr
+from device_ui import BOUNDS_RE, NODE_RE, _attr, screen_extent
 
 CLOSE_LABELS = {
     "close", "fechar", "cerrar", "fermer", "schliessen", "schließen", "chiudi",
@@ -63,17 +63,6 @@ def _is_close_id(node: str) -> bool:
     return any(resource_id.endswith(name) for name in CLOSE_IDS)
 
 
-def _screen(xml: str) -> tuple[int, int]:
-    """Screen extent, taken as the furthest corner any node reaches."""
-    width = height = 0
-    for node in NODE_RE.findall(xml):
-        m = BOUNDS_RE.search(node)
-        if m:
-            _x1, _y1, x2, y2 = (int(g) for g in m.groups())
-            width, height = max(width, x2), max(height, y2)
-    return width, height
-
-
 def _against_an_edge(cx: int, cy: int, width: int, height: int) -> bool:
     return (
         cy <= height * TOP_BAND
@@ -94,7 +83,7 @@ def _corner_distance(cx: int, cy: int, width: int, height: int) -> int:
 
 def find_close_center(xml: str) -> tuple[int, int] | None:
     """Centre of a credible close/skip control, or None to let BACK handle it."""
-    width, height = _screen(xml)
+    width, height = screen_extent(xml)
     if not width or not height:
         return None
 
