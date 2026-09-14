@@ -61,7 +61,7 @@ if "capture_proc" not in st.session_state:
 def device_attached() -> bool:
     try:
         out = subprocess.run(
-            ["adb", "devices"], capture_output=True, text=True, timeout=10
+            ["adb", "devices"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10
         ).stdout
     except FileNotFoundError:
         st.error("`adb` not found on PATH -- install Android platform-tools first.")

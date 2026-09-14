@@ -1,6 +1,6 @@
 ---
-description: Audit checklist quảng cáo cho app trong registry, rồi xuất báo cáo artifact
-argument-hint: "[tên app hoặc package] [--skip|--apk] [--force]"
+description: Audit checklist quảng cáo cho một app theo package, rồi xuất báo cáo artifact
+argument-hint: "<package> [--skip|--apk] [--force]"
 ---
 
 Chạy workflow `audit-fanout` rồi xuất báo cáo. Tham số người dùng đưa vào: $ARGUMENTS
@@ -20,34 +20,46 @@ Từ đây trở đi mọi lệnh bash đều mở đầu bằng `cd <repo> && �
 truyền cho agent đều là **tuyệt đối**. Agent không thừa hưởng CWD của phiên
 gọi — đường dẫn tương đối là cách chắc chắn nhất để nó đọc nhầm file.
 
-## 1. Đọc registry
+## 1. Lấy package
 
-Không nêu app trong `$ARGUMENTS` thì lấy hết registry:
-`<repo>/tools/ad-checklist-diff/apps.json`.
+Command này **chỉ nhận package id**, không nhận tên app. Khớp theo tên là khớp
+mờ: gõ thiếu một ký tự thì nó trả về app hàng xóm chứ không trả về lỗi, và lượt
+capture mặc định `pm clear` đúng cái app nó nhận được — sai app là xoá dữ liệu
+của app không liên quan. Package id gõ sai thì phải hỏng ra mặt, đừng đoán hộ.
 
-Có nêu thì **chỉ nhận package name** — chuỗi dạng `com.abc.xyz`, từ 3 đoạn trở
-lên. Đừng đoán từ tên app: khớp chuỗi con trên 85 app đang cài là kiểu tra cứu
-trông như hiểu ý nhưng hay ra nhầm app, mà chạy nhầm app thì lượt capture
-`pm clear` xoá dữ liệu của app không liên quan.
+`$ARGUMENTS` không có chuỗi nào trông như package (`com.abc.xyz`) thì **dừng**,
+in registry ra và hỏi người dùng chọn. Không nêu app thì cũng **đừng chạy cả
+registry thay thế** — mỗi lượt là một app, do người dùng chỉ đích danh.
 
-Người dùng đưa thứ không phải package name thì **dừng**, nói rõ cần package
-name, và gợi ý cách lấy:
-
-```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device "<tên>"
-```
-
-Lệnh đó để **người** đọc rồi tự chọn, không phải để bạn tự chọn giúp.
-
-Package chưa có trong registry thì thêm vào, `gid` đọc từ sheet chứ không hỏi:
+Có package thì phân giải nó — vẫn **đừng tự so chuỗi**:
 
 ```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<package>"
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --exact "<package>"
 ```
 
-In ra `gid=<số>` là xong. Còn `gid=?` (nhiều tab cùng khai app này, hoặc sheet
-chưa có tab nào cho nó) thì **dừng và hỏi** — chọn bừa là đối chiếu nhầm
-checklist.
+Package **không cần có sẵn trong `apps.json`**. Registry chỉ là cache: mỗi tab
+trong sheet tự khai dòng `Package name` của nó, nên tab nào thuộc app nào là đọc
+được. Registry biết thì trả lời ngay, không biết thì nó hỏi sheet.
+
+Theo exit code:
+
+- `0` — phân giải được, chạy nó. In kèm `gid=… — từ sheet, chưa có trong
+  registry` nghĩa là app chưa được ghi vào `apps.json`; vẫn chạy bình thường
+- `1` — **dừng**, in nguyên văn lý do. Ba lý do khác nhau, đừng gộp:
+  - *Không phải package id* — người dùng gõ tên app. Hỏi lại package
+  - *Sheet không có tab nào khai package này* — chưa có checklist để đối chiếu.
+    Không có gì để chạy; báo để nhờ ads-team thêm tab
+  - *Sheet có 2 tab cùng khai package này* — chọn bừa là đối chiếu nhầm
+    checklist. **Hỏi người dùng** tab nào đúng, rồi ghi entry vào `apps.json`
+    với `gid` đó
+
+Muốn app khỏi phải tra sheet mỗi lượt thì ghi nó vào registry một lần:
+
+```
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<tên trên icon>"
+```
+
+Đây là tiện ích, không phải điều kiện để chạy.
 
 ## 2. Gọi workflow
 
@@ -80,8 +92,8 @@ Với mỗi app vừa chạy:
 
    ```
    cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
-     --findings out/<package>-findings.html \
-     --notes    out/<package>-notes.html \
+     --findings tools/ad-checklist-diff/out/<package>-findings.html \
+     --notes    tools/ad-checklist-diff/out/<package>-notes.html \
      --highlight <đuôi ID mà phần điều tra có giải thích> \
      --run <run ID workflow vừa trả về> \
      --mode <capture|apk|skip — đúng chế độ vừa chạy> \
@@ -116,15 +128,21 @@ Với mỗi app vừa chạy:
    Lệnh này vừa lưu link cho lượt sau vừa bật trình duyệt. Máy không có màn hình
    thì nó báo ra stderr và vẫn lưu link — không coi đó là lỗi của lượt chạy.
 
+   Vẫn in URL ra trong lời báo: browser có thể không mở được, và người ta còn
+   cần link để gửi cho ads-team.
+
 Trang phải mở đầu bằng thống kê khớp/lệch rồi mới tới phần điều tra — builder
 lo sẵn phần đó. Một báo cáo mở đầu bằng đúng một dòng lệch đọc như tool chỉ tìm
 được một dòng, chứ không phải 71/72 khớp.
 
-## 4. Commit
+## 4. Báo cáo markdown
 
-Ghi báo cáo markdown vào `<repo>/plans/reports/`, commit theo conventional
-commits, và push lên remote `duyen` (`origin` là repo khác, không có quyền
-push). `snapshots/` và `out/` nằm trong `.gitignore` — không cố thêm chúng vào.
+Ghi báo cáo vào `<repo>/plans/reports/` — đây là file mà bước 3 truyền vào
+`--report`, nên viết nó trước khi dựng trang.
+
+**Dừng ở đây. Không `git add`, không `git commit`, không `git push`.** Lượt audit
+chỉ sinh ra file; đưa file nào vào lịch sử git là việc của người dùng, không
+phải của command. Muốn commit thì người dùng sẽ tự nói.
 
 ## Báo lại
 

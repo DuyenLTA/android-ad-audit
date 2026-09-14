@@ -4,8 +4,13 @@ Exists because every judge agent was writing its own zipfile sweep, spending
 minutes on it, and reaching for UTF-8 only -- which reports a placement as
 missing from a build that ships it, since dex stores strings UTF-16LE too.
 
-    python apk_strings.py <package> show_inter_feature 4070123043
+    python apk_strings.py --package <package> show_inter_feature 4070123043
     python apk_strings.py --apk build.apk ca-app-pub-1/2
+
+`--package` is a flag, not a positional: every argument without one is a needle,
+so a package written bare is searched for instead of fetched. Teaching the bare
+form is how an agent gets exit 1 from this tool and goes back to writing the
+zipfile sweep it exists to replace.
 
 Prints one line per needle: CÓ with the entries holding it, or KHÔNG. Exit code
 1 when at least one needle is absent, so a script can branch on it.
@@ -15,6 +20,7 @@ import os
 import sys
 
 from apk_source import apk_contains, base_apk, cache_path, device_version_code
+from console_encoding import use_utf8_console
 
 
 def resolve_apk(package: str) -> str:
@@ -54,4 +60,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     main()

@@ -60,12 +60,20 @@ Chi phí đó là của `uiautomator`, không phải của cách gọi.
 
 ## Kết luận
 
-Muốn một lượt nhanh hơn thì cắt ở lớp agent, không phải lớp máy. Lớp máy còn
-đúng một đòn bẩy chưa dùng: luồng nào không tới được Home vẫn đốt trọn 300s
-timeout. Chưa sửa vì không phân biệt được "đang chờ countdown" với "đã kẹt".
+Muốn một lượt nhanh hơn thì cắt ở lớp agent, không phải lớp máy.
+
+**Cập nhật 2026-09-13:** đòn bẩy còn lại ở lớp máy đã dùng. Luồng không tới được
+Home giờ dừng sớm thay vì đốt trọn 300s. Chỗ từng kẹt — phân biệt "đang chờ
+countdown" với "đã kẹt" — hoá ra không cần đoán: màn chờ countdown là màn có
+`repeat_from`, tức nó vẫn liên tục thực hiện step, nên nó không bao giờ rơi vào
+trạng thái rỗi. Chỉ màn không khớp rule nào, hoặc đã hết step và không có
+`repeat_from`, mới đếm rỗi; đủ `STUCK_POLLS = 15` (~30s) thì dừng. Timeout giữ
+nguyên làm lưới chặn cuối. Kết quả trả về thêm trường `stopped`
+(`home` / `stuck` / `timeout`) để bản tóm tắt nói đúng lý do thay vì gọi mọi
+thất bại là timeout.
 
 ## Chưa giải quyết
 
-- Có nên cho `drive_to_home` bỏ sớm khi màn không đổi và mọi step đã dùng hết?
-  Rủi ro: `repeat_from` cố ý lặp lại bước đóng ads trong lúc chờ countdown.
 - `DEFAULT_DWELL_SECONDS = 12` chưa được đo lại bao giờ; có thể thừa hoặc thiếu.
+- `STUCK_POLLS = 15` chọn theo suy luận, chưa đo trên máy thật: chưa có lượt nào
+  kẹt thật sự để biết 30s rỗi là đủ rộng hay đã quá rộng.

@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 from artifact_run_context import capture_warning, delta_note, mode_label
+from console_encoding import use_utf8_console
 
 HERE = Path(__file__).parent
 TEMPLATE = HERE / "artifact_report_template.html"
@@ -201,4 +202,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     main()

@@ -13,11 +13,29 @@ import time
 from device_flow import DEFAULT_HOME_MATCH, DEFAULT_RULES, perform_step, rule_for
 from device_ui import adb_run, focused_package_activity, screen_size, spam_tap, ui_xml
 
-SPLASH_TAPS = 40
+SPLASH_TAPS_PER_SPOT = 10
+# Where the splash logo sits, as a fraction of screen height. It is a sweep
+# rather than one point because the logo's height differs per app and a miss is
+# silent: tapping the logo is what turns on the app's tester logging, and the
+# single 0.44 this used to guess landed in the empty gap 254px BELOW Cast to
+# TV's logo. Every FOR_TESTER line was lost, which in turn cost the checklist
+# its only runtime evidence -- rows then fell back to APK-only reasoning and one
+# fell through even that. Measured: a tap costs ~22ms on device, so covering the
+# whole band is cheaper than being wrong once.
+SPLASH_SPOT_FRACTIONS = (0.25, 0.33, 0.40, 0.47)
+# The splash window only opens ~400ms after launch; tapping before it is drawn
+# spends the first burst on the launcher.
+SPLASH_APPEAR_SECONDS = 0.5
 # Home placements (banner, native) request after the screen settles, and some
 # non-`_high` fallbacks only fire once their `_high` sibling finishes.
 DEFAULT_DWELL_SECONDS = 12
 POLL_SECONDS = 2
+# Polls with nothing left to try before calling the journey stuck. A screen only
+# goes idle here when no rule matches it, or its rule ran out of steps and has no
+# `repeat_from` -- the countdown case keeps performing steps, so it never idles
+# and is never cut short. 15 polls is ~30s of a screen that changed nothing and
+# offered nothing, against the 300s a stuck journey used to burn in full.
+STUCK_POLLS = 15
 
 
 def launch(package: str, run=adb_run) -> None:
@@ -39,31 +57,49 @@ def force_stop(package: str, run=adb_run) -> None:
     run(["shell", "am", "force-stop", package], timeout=60)
 
 
-SPLASH_CHUNK = 8
+def splash_spots(
+    tap_xy: tuple[int, int] | None, run=adb_run
+) -> list[tuple[int, int]]:
+    """The points to try, centred horizontally, sweeping the logo band.
+
+    An app whose splash does not follow the template can pin one point via the
+    registry's `splash_tap`; then that point is the only one tried.
+    """
+    if tap_xy is not None:
+        return [tap_xy]
+    w, h = screen_size(run=run) or (1080, 2280)
+    return [(w // 2, int(h * f)) for f in SPLASH_SPOT_FRACTIONS]
 
 
 def splash_logo_spam(
-    tap_xy: tuple[int, int] | None, package: str | None = None, run=adb_run
-) -> tuple[int, int]:
-    """Spam the splash logo, stopping the moment the splash is gone.
+    tap_xy: tuple[int, int] | None,
+    package: str | None = None,
+    run=adb_run,
+    sleep=time.sleep,
+) -> list[tuple[int, int]]:
+    """Tap the splash logo to turn on tester logging, stopping when it is gone.
 
-    Tapping blind past the splash is how a run once ended up inside YouTube:
-    an interstitial had appeared and the remaining taps landed on the ad. So
-    the taps go in small bursts and stop as soon as focus leaves the app or an
-    ad activity takes over.
+    Each spot gets its own burst rather than the taps being spread across the
+    band: the gesture is a count of taps on the logo, so ten in a row on the
+    right spot beats forty scattered over four.
+
+    Tapping blind past the splash is how a run once ended up inside YouTube: an
+    interstitial had appeared and the remaining taps landed on the ad. So the
+    bursts stop as soon as focus leaves the app or an ad activity takes over.
     """
-    if tap_xy is None:
-        w, h = screen_size(run=run) or (1080, 2280)
-        tap_xy = (w // 2, int(h * 0.44))
-    for _ in range(0, SPLASH_TAPS, SPLASH_CHUNK):
-        spam_tap(tap_xy[0], tap_xy[1], SPLASH_CHUNK, run=run)
+    sleep(SPLASH_APPEAR_SECONDS)
+    spots = splash_spots(tap_xy, run=run)
+    tapped = []
+    for spot in spots:
+        spam_tap(spot[0], spot[1], SPLASH_TAPS_PER_SPOT, run=run)
+        tapped.append(spot)
         found = focused_package_activity(run=run)
         if not found:
             break
         pkg, activity = found
         if (package and pkg != package) or "AdActivity" in activity:
             break
-    return tap_xy
+    return tapped
 
 
 def drive_to_home(
@@ -73,11 +109,18 @@ def drive_to_home(
     rules: list[dict] | None = None,
     timeout: int = 240,
     dwell: int = DEFAULT_DWELL_SECONDS,
+    stuck_polls: int = STUCK_POLLS,
     xml_fn=None,
     run=adb_run,
     sleep=time.sleep,
 ) -> dict:
-    """Poll the focused screen, perform its next step, stop at Home or timeout."""
+    """Poll the focused screen, perform its next step, stop at Home.
+
+    Three ways out: Home, nothing left to try (`stuck`), or the deadline. The
+    deadline is the backstop, not the plan -- a journey that cannot reach Home
+    used to sit on a dead screen until the full timeout elapsed, which is pure
+    waste and, worse, indistinguishable in the summary from a slow success.
+    """
     xml_fn = xml_fn or (lambda: ui_xml(run=run))
     rules = rules if rules is not None else DEFAULT_RULES
 
@@ -93,6 +136,8 @@ def drive_to_home(
     last_short = None
     deadline = time.monotonic() + timeout
     reached_home = False
+    stopped = "timeout"
+    idle = 0
 
     while time.monotonic() < deadline:
         found = focused_package_activity(run=run)
@@ -102,6 +147,7 @@ def drive_to_home(
             visits[short] = visits.get(short, 0) + 1
             visited.append(short)
             last_short = short
+            idle = 0  # a new screen is progress, whatever happens on it
 
         rule = rule_for(activity, rules)
 
@@ -117,11 +163,13 @@ def drive_to_home(
         if package and focused_pkg and focused_pkg != package and not (rule and rule.get("system")):
             actions.append(f"{short}: ngoài app ({focused_pkg}) -- mở lại app")
             launch(package, run=run)
+            idle = 0  # relaunching is an act, and the next screen is unknown
             sleep(POLL_SECONDS)
             continue
 
         if home_match in activity and (not package or focused_pkg == package):
             reached_home = True
+            stopped = "home"
             break
 
         if rule:
@@ -139,12 +187,28 @@ def drive_to_home(
                 # screen simply skipped it (labels differ by remote config),
                 # and retrying it forever would stall the run.
                 progress[key] = index + 1
+                idle = 0  # something was still worth trying on this screen
                 if label:
                     actions.append(f"{short}: {label}")
+                sleep(POLL_SECONDS)
+                continue
+
+        # Nothing matched this screen, or its steps are spent and it does not
+        # ask to cycle. Waiting longer cannot change either fact.
+        idle += 1
+        if idle >= stuck_polls:
+            actions.append(f"{short}: hết cách thử -- dừng sớm")
+            stopped = "stuck"
+            break
         sleep(POLL_SECONDS)
 
     if reached_home:
         sleep(dwell)  # let Home's own placements request
-    return {"reached_home": reached_home, "visited": visited, "actions": actions}
+    return {
+        "reached_home": reached_home,
+        "stopped": stopped,
+        "visited": visited,
+        "actions": actions,
+    }
 
 

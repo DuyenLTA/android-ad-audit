@@ -34,7 +34,7 @@ def apk_app_label(apk_path: str, aapt2: str | None = None) -> str | None:
     try:
         dump = subprocess.run(
             [aapt2, "dump", "badging", apk_path],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         ).stdout
     except (subprocess.SubprocessError, OSError):
         return None

@@ -34,7 +34,7 @@ def installed_packages(serial: str | None = None) -> list[str]:
         "shell", "cmd", "package", "list", "packages", "-3",
     ]
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=30).stdout
+        out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
     except (subprocess.SubprocessError, OSError):
         return []
     return sorted(
@@ -55,7 +55,7 @@ def installed_versions(serial: str | None = None) -> dict[str, str]:
         "shell", "cmd", "package", "list", "packages", "-3", "--show-versioncode",
     ]
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=30).stdout
+        out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30).stdout
     except (subprocess.SubprocessError, OSError):
         return {}
     versions = {}
@@ -102,7 +102,7 @@ def read_label(package: str, serial: str | None = None, aapt2: str | None = None
         if not stub_apk(package, stub, serial):
             return None
         dump = subprocess.run(
-            [aapt2, "dump", "badging", stub], capture_output=True, text=True, timeout=60
+            [aapt2, "dump", "badging", stub], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60
         ).stdout
     except (subprocess.SubprocessError, OSError):
         return None

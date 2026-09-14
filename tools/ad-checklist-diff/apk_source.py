@@ -38,6 +38,10 @@ def find_aapt2() -> str | None:
         os.environ.get("ANDROID_SDK_ROOT"),
         os.path.expanduser("~/Android/Sdk"),
         os.path.expanduser("~/Library/Android/sdk"),
+        # Where Android Studio installs the SDK on Windows by default.
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "Android", "Sdk")
+        if os.environ.get("LOCALAPPDATA")
+        else None,
     ]
     for root in roots:
         if not root:
@@ -51,7 +55,7 @@ def find_aapt2() -> str | None:
 def device_apk_path(package: str) -> str | None:
     """Path of the installed base APK on the device, per `pm path`."""
     out = subprocess.run(
-        ["adb", "shell", "pm", "path", package], capture_output=True, text=True, timeout=20
+        ["adb", "shell", "pm", "path", package], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20
     ).stdout
     for line in out.splitlines():
         line = line.strip()
@@ -65,7 +69,7 @@ def device_version_code(package: str) -> str | None:
     out = subprocess.run(
         ["adb", "shell", "dumpsys", "package", package],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=60,
     ).stdout
     m = VERSION_CODE_RE.search(out)
@@ -113,7 +117,7 @@ def base_apk(package: str) -> tuple[str | None, bool]:
         fd, local_apk = tempfile.mkstemp(suffix=".apk", prefix="adcheck_apk_")
     os.close(fd)
     pull = subprocess.run(
-        ["adb", "pull", apk_path, local_apk], capture_output=True, text=True, timeout=600
+        ["adb", "pull", apk_path, local_apk], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=600
     )
     if pull.returncode != 0:
         os.unlink(local_apk)
@@ -134,7 +138,7 @@ def manifest_app_id(apk_path: str, aapt2: str) -> str | None:
     dump = subprocess.run(
         [aapt2, "dump", "xmltree", "--file", "AndroidManifest.xml", apk_path],
         capture_output=True,
-        text=True,
+        text=True, encoding="utf-8", errors="replace",
         timeout=180,
     )
     if dump.returncode != 0:

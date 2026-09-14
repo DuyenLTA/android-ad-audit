@@ -25,6 +25,7 @@ import sys
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
+from console_encoding import use_utf8_console
 
 LINK_FILE = Path(__file__).parent / "artifact-link.json"
 LINKS_FILE = Path(__file__).parent / "artifact-links.json"
@@ -126,4 +127,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    use_utf8_console()
     main()

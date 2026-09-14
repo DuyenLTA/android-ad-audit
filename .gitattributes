@@ -1,0 +1,3 @@
+# Workflow scripts are read verbatim by the Workflow tool, which rejects the
+# lone CR of a CRLF pair as a hidden control character. Keep them LF on checkout.
+*.mjs text eol=lf
