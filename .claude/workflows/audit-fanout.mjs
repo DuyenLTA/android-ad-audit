@@ -178,7 +178,20 @@ build_ad_ids, missed_home, empty_filters.
 ${toolDir}/snapshots/${pkg}.json là file lớn: CHỈ mở khi thật sự cần đối chiếu
 dòng anh em (twin) hoặc danh sách leftover_ids, và khi mở thì chỉ đọc phần cần.
 
-Với MỖI dòng trong triage (chỉ những dòng này, không xét dòng đã Khớp), kết luận:
+TRƯỚC HẾT, xem các rổ trong triage. Một rổ tồn tại vì mọi dòng trong nó cùng
+một tình trạng, và tình trạng đó thường đã là câu trả lời cho cả rổ. Rổ nào cùng
+CHUNG một nguyên nhân thì viết ĐÚNG MỘT finding cho cả rổ: "value" đặt là tên
+rổ, "label" ghi số dòng, evidence chứng minh nguyên nhân chung đó. Chỉ tách ra
+thành finding riêng những dòng THOÁT khỏi nguyên nhân chung (có bằng chứng riêng
+nói khác đi).
+
+Ví dụ rõ nhất: "apk_scan_applicable: false" nghĩa là app nạp ad unit ID lúc chạy,
+nên MỌI dòng trong rổ "APK không kiểm được" đều chưa kết luận được vì cùng đúng
+một lý do. Viết 44 lần cùng một lập luận không thêm thông tin nào, chỉ làm báo
+cáo dài ra và lượt chạy lâu ra.
+
+Sau đó, với những dòng CÒN LẠI (chỉ những dòng chưa được rổ trả lời, không xét
+dòng đã Khớp), kết luận:
 - checklist-sai: ID trong sheet không tồn tại trong build, và log cho thấy build dùng ID khác
 - build-thieu: placement không có trong build (tên placement cũng không xuất hiện)
 - chua-capture-du: dòng này cần luồng/màn chưa được capture
