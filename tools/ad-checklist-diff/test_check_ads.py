@@ -123,13 +123,6 @@ def test_default_filters_catch_the_bare_tag_interstitial_load(tmp_path):
     assert "ca-app-pub-4973559944609228/6620824217" in values
 
 
-def test_gui_and_cli_share_one_filter_list():
-    # Two copies drift, and then the same row reads Khớp in one and Lệch in the other.
-    import streamlit_app
-
-    assert streamlit_app.FILTERS is DEFAULT_FILTERS
-
-
 def test_sheet_csv_url_preserves_gid():
     url = "https://docs.google.com/spreadsheets/d/ABC123/edit#gid=456"
     assert sheet_csv_url(url) == (

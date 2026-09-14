@@ -31,7 +31,8 @@ Reading the manifest needs `aapt2` (Android SDK build-tools); ad unit IDs need
 no extra tooling. When something is unavailable the affected rows are marked
 explicitly unverified rather than silently passed or failed.
 
-GUI-only (see streamlit_app.py): check_ads.py's CLI never touches a device.
+Needs a device: check_ads.py's own CLI never touches one, so these rows are
+verified by audit_runner.py, which does.
 """
 import os
 import re

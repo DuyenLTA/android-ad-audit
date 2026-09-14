@@ -4,21 +4,19 @@ Diff a Google Sheet ad/config checklist against a captured Android `logcat`
 file. Matches by **value** (token, ad unit ID), not by label -- placement
 naming differs per app, values are unique.
 
-Full usage guide (overview, install, GUI/CLI walkthrough, troubleshooting):
-https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
+Hướng dẫn vận hành (pipeline, cài đặt, ba cách chạy, đọc kết quả):
+https://claude.ai/code/artifact/d7935fbb-3fe8-48fa-8a70-c56b9c51fa4c
 
 ## What this does NOT do
 
 - `check_ads.py` (the CLI) does not touch a device or run `adb` in any way --
-  you capture the log yourself, by hand, and hand it a file.
-  `streamlit_app.py` (the GUI) *does* run `adb` locally to capture for you,
-  see below -- but neither ever triggers the app's own debug/tester log dump
-  (tapping the splash logo, navigating onboarding, etc). You still have to
-  operate the phone yourself.
+  you capture the log yourself, by hand, and hand it a file. `audit_runner.py`
+  *does* drive the phone, including the splash-logo taps that turn on the app's
+  own tester log dump -- that is the path the `/audit-fanout` workflow uses.
 - Does not fuzzy-match labels -- only exact value presence, plus the
   narrowly-scoped fallbacks documented under "Reading the result" below.
 - Cannot verify things that never appear inside a trusted (`--filter`-matched)
-  line. CLI and GUI share one filter list (`DEFAULT_FILTERS` in `check_ads.py`:
+  line. Every caller shares one filter list (`DEFAULT_FILTERS` in `check_ads.py`:
   `FOR_TESTER`, `VslTemplate4FirstOpenSDK`,
   `AdsConsentManager`, `RemoteConfigRepository`, `inter_ads`,
   `loadInterstitialAd`), which covers every area the Nexus app checklist needs.
@@ -35,9 +33,9 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   lạc kiểu đó từng làm cảnh báo "filter khớp 0 dòng" im lặng, và 5 dòng cấu hình
   đúng bị báo lệch.
 - Package name is verified separately via `adb shell pm list packages`
-  (GUI only) since it's never printed in any log line at all.
+  (needs a device) since it's never printed in any log line at all.
 - The AdMob **App ID** and the ad unit IDs of placements a capture never
-  exercised are verified against the **installed APK** instead (GUI only):
+  exercised are verified against the **installed APK** instead:
   some apps never print the App ID to logcat, and an ad unit ID only reaches
   logcat when the app actually requests that placement -- which used to mean
   walking every screen, including flows like an uninstall survey that are
@@ -52,22 +50,17 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   **once** per run in the report, not under individual rows -- that list is
   capture-wide, and pasting it under a row read as a per-row finding it never
   was.
-- The GUI cannot publish the report to a shareable claude.ai link by itself:
+- Nothing here can publish the report to a shareable claude.ai link by itself:
   creating an artifact is a Claude Code action inside a chat turn, and a
-  headless `claude -p` run has no Artifact tool. What it does instead: the
-  report is always written to one fixed path (`static/adcheck-report.html`), so
-  publishing it once yields a URL that stays valid -- Claude republishing that
-  same path refreshes the artifact in place. Record the URL with
-  `python artifact_link.py <url>` and the "Mở report toàn màn hình" button
-  opens the shareable artifact from then on, warning when the artifact is older
-  than the run just finished. Note the report carries the Adjust token, the
-  Facebook app id/client token and every ad unit ID, so publishing sends that
-  to claude.ai (artifacts are private unless shared).
+  headless `claude -p` run has no Artifact tool. Claude publishes the page and
+  the URL is recorded per package, so a rerun updates the same page instead of
+  forking a second one. Note the report carries the Adjust token, the Facebook
+  app id/client token and every ad unit ID, so publishing sends that to
+  claude.ai (artifacts are private unless shared).
 
 ### Link artifact theo từng app
 
-GUI dùng một link cố định cho `static/adcheck-report.html`. Lượt fan-out thì mỗi
-app một trang riêng, nên link lưu theo package:
+Mỗi app một trang riêng, nên link lưu theo package:
 
 ```
 python artifact_link.py --package <pkg> <url>          # ghi lại sau khi publish
@@ -83,32 +76,10 @@ phải của repo.
 ## Setup
 
 ```
-pip install requests streamlit   # streamlit only needed for the GUI
+pip install requests
 ```
 
-## Option A: GUI (no terminal commands after setup)
-
-```
-streamlit run streamlit_app.py
-```
-
-Opens a local page in your browser: paste the sheet URL, click **Start**.
-Filters are fixed (not editable) -- shown as chips. It clears the logcat
-buffer and starts capturing in the background -- go operate the phone (open
-the app, walk through onboarding, go to home; pause a couple seconds per
-screen rather than rushing, some placements only preload after their
-`_high` sibling finishes). Click **Stop** when done; a per-section score
-summary appears immediately, with a full-width button to open the report
-in a new tab and an expander to preview it inline. This is a **local** app
--- it is not a shareable web link. If you want a shareable link, ask Claude
-to publish the saved report file as an artifact in a chat turn.
-
-If you close the browser tab (or refresh it) mid-capture instead of
-clicking Stop, the `adb logcat` process keeps running orphaned in the
-background -- kill it via Task Manager (or `adb kill-server` if you don't
-mind resetting other adb connections too) if this happens.
-
-## Option B: CLI
+## CLI
 
 ### 1. Capture a log
 
@@ -143,7 +114,7 @@ once per checklist area you captured this run.
 
 ## Reading the result
 
-- Terminal (or the GUI page) prints `[matched/total] section name`, plus any
+- Terminal prints `[matched/total] section name`, plus any
   value found in the log that isn't in the checklist.
 - If a `--filter` you passed matched **zero** log lines this run, that's
   called out as an explicit warning -- it means your capture doesn't cover
@@ -161,7 +132,7 @@ once per checklist area you captured this run.
     only same-line co-occurrence with a confirmed match counts now).
   - Otherwise -> "không thấy ID lệch nào tương ứng trong log" (nothing
     found), rather than staying silent.
-- `report.html` (or the equivalent GUI output) is the same info as a
+- `report.html` is the same info as a
   browsable report.
 
 ## Sheet requirements

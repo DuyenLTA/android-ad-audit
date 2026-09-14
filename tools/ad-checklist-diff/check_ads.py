@@ -13,7 +13,7 @@ import json
 import os
 import sys
 
-# Re-exported here so callers (streamlit_app.py, tests) keep importing
+# Re-exported here so callers (audit_pipeline, tests) keep importing
 # everything from this one module -- the split below is just to keep each
 # file under ~200 lines, not a public API change.
 from checklist_source import ID_RE, fetch_checklist, parse_checklist_csv, sheet_csv_url  # noqa: F401
@@ -220,7 +220,7 @@ def print_summary(result: dict, empty_filters: list[str]) -> None:
 
 
 # The org's standard logcat filters -- the single list, shared by the CLI and
-# the GUI, because two copies drift and then a row reads "Khớp" in one and
+# audit_runner, because two copies drift and then a row reads "Khớp" in one and
 # "Lệch" in the other.
 #
 # Why each one is here:

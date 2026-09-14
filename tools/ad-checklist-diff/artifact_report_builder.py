@@ -1,6 +1,6 @@
 """Render a snapshot into the shareable artifact page for the ads team.
 
-`report_renderer.py` writes the operator's page -- the one the Streamlit app
+`report_renderer.py` writes the operator's page -- the one a local run
 links to right after a run. This one targets a different reader: the page that
 gets published and sent to whoever owns the checklist, so it leads with the
 score (how many rows khớp, how many lệch) and only then opens the tables.

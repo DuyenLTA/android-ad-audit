@@ -1,8 +1,8 @@
-"""One audit run, composed once and shared by the CLI and the GUI.
+"""One audit run, composed once and shared by every caller.
 
-The GUI used to wire the steps together itself, which left the CLI unable to
+The steps used to be wired together per caller, which left the CLI unable to
 verify anything the log could not show (App ID, placements the capture never
-exercised). Both now call `run_audit`, so a headless run and a GUI run reach
+exercised). Everything now calls `run_audit`, so every caller reaches
 the same verdict.
 
 Log and APK are independent sources: with only a log it is the classic diff,

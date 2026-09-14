@@ -1,17 +1,9 @@
-"""Remember the claude.ai artifact URL that the report file was published to.
+"""Remember the claude.ai artifact URL that each app's report was published to.
 
 The report cannot publish itself: creating an artifact is a Claude Code action
 inside a chat turn, and a headless `claude -p` run has no Artifact tool at all
 (verified -- `select:Artifact` resolves to nothing there). What *is* stable is
 the URL: republishing the same file path updates the same artifact in place.
-
-So the report is written to one fixed path, published once, and the resulting
-URL recorded here. From then on the GUI's button opens the shareable artifact
-instead of the local page, and Claude republishing that path refreshes it
-without the link ever changing.
-
-`published_at` is compared against the report file's mtime so the GUI can say
-when the artifact is older than the run just finished.
 
 Each audited app has its own artifact, so those URLs are kept per package in
 `artifact-links.json`. Without that record a later run has no way to know an app
@@ -26,46 +18,13 @@ to find out whether a page already exists.
 """
 import argparse
 import json
-import os
 import sys
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 from console_encoding import use_utf8_console
 
-LINK_FILE = Path(__file__).parent / "artifact-link.json"
 LINKS_FILE = Path(__file__).parent / "artifact-links.json"
-
-
-def read_link(link_file: Path | None = None) -> dict | None:
-    """The recorded artifact URL, or None if the report was never published."""
-    link_file = link_file or LINK_FILE
-    try:
-        data = json.loads(link_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    return data if data.get("url") else None
-
-
-def write_link(url: str, link_file: Path | None = None) -> dict:
-    """Record the artifact URL the report path is published to."""
-    link_file = link_file or LINK_FILE
-    data = {"url": url, "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
-    link_file.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    return data
-
-
-def is_stale(link: dict, report_path: Path) -> bool:
-    """True when the report on disk is newer than the published artifact."""
-    published_at = link.get("published_at")
-    if not published_at or not report_path.exists():
-        return False
-    try:
-        published = datetime.fromisoformat(published_at)
-    except ValueError:
-        return False
-    report_mtime = datetime.fromtimestamp(os.path.getmtime(report_path), timezone.utc)
-    return report_mtime > published
 
 
 def read_app_links(links_file: Path | None = None) -> dict:
@@ -107,33 +66,23 @@ def open_in_browser(url: str) -> bool:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Ghi / mở link artifact")
     parser.add_argument("url", nargs="?", help="URL vừa publish")
-    parser.add_argument("--package", help="ghi link cho riêng app này")
+    parser.add_argument("--package", required=True, help="app cần ghi / tra link")
     parser.add_argument("--show", action="store_true", help="in link đã lưu, không mở")
     # Kept so older callers still parse; opening is the default now.
     parser.add_argument("--open", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--no-open", dest="no_open", action="store_true", help="chỉ ghi link, đừng mở")
     args = parser.parse_args()
 
-    if args.package:
-        if args.url:
-            write_app_link(args.package, args.url)
-        url = args.url or read_app_link(args.package)
-        if not url:
-            raise SystemExit(f"Chưa có link nào cho {args.package}")
-        print(url)
-        # Opens when a URL was just recorded. `--show` is the pre-publish
-        # lookup, so it stays silent in the browser.
-        if args.url and not args.no_open and not open_in_browser(url):
-            print("Không mở được trình duyệt ở máy này.", file=sys.stderr)
-        return
-
-    if args.show:
-        link = read_link()
-        print(link["url"] if link else "(chưa publish lần nào)")
-        return
-    if not args.url:
-        raise SystemExit("usage: python artifact_link.py [--package <pkg>] <artifact-url>")
-    print(write_link(args.url))
+    if args.url:
+        write_app_link(args.package, args.url)
+    url = args.url or read_app_link(args.package)
+    if not url:
+        raise SystemExit(f"Chưa có link nào cho {args.package}")
+    print(url)
+    # Opens when a URL was just recorded. `--show` is the pre-publish lookup,
+    # so it stays silent in the browser.
+    if args.url and not args.no_open and not open_in_browser(url):
+        print("Không mở được trình duyệt ở máy này.", file=sys.stderr)
 
 
 if __name__ == "__main__":
