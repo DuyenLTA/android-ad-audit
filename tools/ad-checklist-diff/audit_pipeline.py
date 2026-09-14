@@ -76,7 +76,7 @@ def run_audit(
     key_pairs: dict = {}
     cooccurrences: dict = {}
     if log_path:
-        by_filter = load_trusted_lines(log_path, filters, package=package)
+        by_filter = load_trusted_lines(log_path, filters)
         empty_filters = [f for f, lines in by_filter.items() if not lines]
         lines = [line for group in by_filter.values() for line in group]
         trusted_values = extract_values(lines)
