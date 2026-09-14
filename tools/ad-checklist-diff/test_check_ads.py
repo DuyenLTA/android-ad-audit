@@ -1,6 +1,7 @@
 import check_ads
 from check_ads import (
     DEFAULT_FILTERS,
+    checklist_fingerprint,
     diff,
     extract_key_cooccurrences,
     extract_key_value_pairs,
@@ -410,3 +411,47 @@ def test_a_label_with_no_alias_is_unaffected():
         {"label": "Facebook App ID", "value": "123"}, {"setupAdjust": "sandbox"}, {}, []
     )
     assert "sandbox" not in note
+
+
+# --- Telling one revision of the checklist from another ---------------------
+
+def _rows(value="v", alt=()):
+    return [{"section": "S", "label": "x", "value": value, "alt_values": list(alt)}]
+
+
+def test_the_same_checklist_fingerprints_the_same():
+    assert checklist_fingerprint(_rows()) == checklist_fingerprint(_rows())
+
+
+def test_a_changed_value_changes_the_fingerprint():
+    assert checklist_fingerprint(_rows()) != checklist_fingerprint(_rows("v2"))
+
+
+def test_a_changed_alt_value_changes_the_fingerprint():
+    # An alt value is what makes a row match; editing one is editing the row.
+    assert checklist_fingerprint(_rows()) != checklist_fingerprint(_rows(alt=["w"]))
+
+
+def test_reordered_alt_values_are_the_same_checklist():
+    # Order in that cell carries nothing -- any of them counts as a match -- so
+    # reordering must not read as a new revision and re-audit every app.
+    assert checklist_fingerprint(_rows(alt=["a", "b"])) == checklist_fingerprint(
+        _rows(alt=["b", "a"])
+    )
+
+
+def test_a_row_that_moved_section_is_a_different_checklist():
+    moved = [{"section": "T", "label": "x", "value": "v", "alt_values": []}]
+    assert checklist_fingerprint(_rows()) != checklist_fingerprint(moved)
+
+
+def test_an_added_row_changes_the_fingerprint():
+    assert checklist_fingerprint(_rows()) != checklist_fingerprint(_rows() + _rows("v2"))
+
+
+def test_columns_the_parser_ignores_do_not_change_it():
+    # Only what parse_checklist_csv keeps is hashed, so a comment typed in a
+    # fourth column does not have every app re-audited.
+    plain = parse_checklist_csv("S,,\nx,v,\n")
+    commented = parse_checklist_csv("S,,\nx,v,,ghi chú của ads-team\n")
+    assert checklist_fingerprint(plain) == checklist_fingerprint(commented)

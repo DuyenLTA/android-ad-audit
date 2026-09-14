@@ -16,7 +16,13 @@ import sys
 # Re-exported here so callers (audit_pipeline, tests) keep importing
 # everything from this one module -- the split below is just to keep each
 # file under ~200 lines, not a public API change.
-from checklist_source import ID_RE, fetch_checklist, parse_checklist_csv, sheet_csv_url  # noqa: F401
+from checklist_source import (  # noqa: F401
+    ID_RE,
+    checklist_fingerprint,
+    fetch_checklist,
+    parse_checklist_csv,
+    sheet_csv_url,
+)
 from log_extractor import (  # noqa: F401
     SHOW_PREFIX,
     extract_key_cooccurrences,

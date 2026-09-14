@@ -5,9 +5,11 @@ it, so nobody notices the one row that broke. What matters between runs is the
 delta -- rows that started failing, rows that got fixed, and ad unit IDs the
 build started using.
 
-Snapshots are keyed by package and carry the build's `versionCode`, which is
-also the cheap test for "is there anything new to audit at all": same build,
-same APK, same answer.
+Snapshots are keyed by package and carry two things a re-run tests before
+deciding it has nothing to do: the build's `versionCode`, and a digest of the
+checklist that verdict was reached against. Both halves of the comparison have
+to be unchanged -- the ads team edits the sheet without anybody reinstalling
+the app, and a run keyed on the build alone would serve a stale verdict.
 """
 import json
 from datetime import datetime, timezone
@@ -22,12 +24,22 @@ def snapshot_path(package: str, directory: Path | str = DEFAULT_DIR) -> Path:
     return Path(directory) / f"{package}.json"
 
 
-def save(package: str, result: dict, version_code: str | None, directory=DEFAULT_DIR) -> Path:
+def save(
+    package: str,
+    result: dict,
+    version_code: str | None,
+    directory=DEFAULT_DIR,
+    checklist_digest: str | None = None,
+) -> Path:
     path = snapshot_path(package, directory)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "package": package,
         "version_code": version_code,
+        # Which revision of the checklist this verdict answers. Absent in
+        # snapshots written before this existed, which reads as unknown --
+        # so the app is audited once more rather than skipped on a guess.
+        "checklist_digest": checklist_digest,
         "audited_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "result": result,
     }

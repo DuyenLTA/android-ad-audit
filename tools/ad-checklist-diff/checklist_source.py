@@ -1,6 +1,8 @@
 """Fetch and parse the Google Sheet checklist into (section, label, value) rows."""
 import csv
+import hashlib
 import io
+import json
 import re
 
 import requests
@@ -65,3 +67,24 @@ def fetch_checklist(sheet_url: str) -> list[dict]:
             "Check the sheet is shared as 'Anyone with the link can view'."
         )
     return parse_checklist_csv(resp.text)
+
+
+def checklist_fingerprint(rows: list[dict]) -> str:
+    """A short digest of the checklist as parsed, for telling one revision apart.
+
+    The build is only half of what an audit compares: the other half is the
+    sheet, and the ads team edits it without anybody reinstalling the app. A run
+    keyed on versionCode alone answers a question nobody asked -- "has the build
+    changed" -- and quietly serves the previous verdict against a checklist that
+    no longer says the same thing.
+
+    Hashes the parsed rows rather than the CSV bytes, so a re-export, a changed
+    comment column or a reordered blank line does not read as a new checklist,
+    while any change to a section, label, value or alt value does.
+    """
+    canonical = [
+        [r["section"], r["label"], r["value"], sorted(r.get("alt_values") or [])]
+        for r in rows
+    ]
+    blob = json.dumps(canonical, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]

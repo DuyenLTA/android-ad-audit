@@ -72,10 +72,19 @@ def capture_warning(triage: dict | None) -> str:
     if "missed_home" in triage:
         missed = triage["missed_home"]
         if missed is None:
-            warnings.append(
+            note = (
                 "Lượt này <b>không capture</b> — mọi kết luận dựa trên "
                 "&ldquo;log không có&rdquo; đều không đứng được."
             )
+            # Dấu hiệu build dev chỉ hiện ra ở giá trị app chạy ra. None nghĩa là
+            # lượt này không có gì để đọc, khác hẳn [] nghĩa là đã đọc và sạch --
+            # và trang phải nói ra, nếu không người đọc mặc định tưởng đã kiểm.
+            if triage.get("dev_build_signals") is None:
+                note += (
+                    " Cũng vì thế mà chưa kiểm được đây là build release hay "
+                    "build dev."
+                )
+            warnings.append(note)
         elif missed:
             names = ", ".join(html.escape(str(m)) for m in missed)
             warnings.append(
@@ -85,6 +94,15 @@ def capture_warning(triage: dict | None) -> str:
     else:
         warnings.append(
             "Triage sinh từ bản tool cũ, không ghi lại lượt capture đã đi tới đâu."
+        )
+
+    reused = triage.get("capture_reused_from")
+    if reused:
+        warnings.append(
+            "Checklist đổi nhưng build chưa đổi, nên lượt này <b>dùng lại log "
+            f"capture ngày {html.escape(str(reused))}</b> thay vì lái máy lần nữa. "
+            "Log mô tả đúng build đang cài; dòng nào cần màn mà lượt capture đó "
+            "chưa đi tới thì vẫn chưa có bằng chứng."
         )
 
     empty = triage.get("empty_filters") or []

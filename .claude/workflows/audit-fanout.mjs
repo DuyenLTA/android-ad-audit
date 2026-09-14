@@ -28,10 +28,11 @@ export const meta = {
 //   'capture' (default) -- drive the phone, then audit against that log
 //   'apk'               -- audit from the APK only, no device driving
 //   'skip'              -- judge whatever triage is already on disk
-// `force: true` re-audits a build already audited; without it the runner skips
-// an unchanged versionCode and the triage on disk still stands, which is the
-// point of the snapshot -- same build, same answer, no reason to drive the
-// phone again.
+// `force: true` re-audits an app the runner would otherwise leave alone. It
+// skips only when BOTH halves of the comparison are unchanged -- same build
+// and same checklist -- and the triage on disk still stands. An edited sheet
+// on an unchanged build re-diffs the stored capture instead of driving the
+// phone again: nothing the sheet says can change what the app already did.
 // The audit runs here rather than being a separate thing to remember, because a
 // triage nobody refreshed is the failure this whole tool exists to avoid: an
 // APK-only triage carries "chưa thấy trong log" rows that are artefacts of not
@@ -274,8 +275,8 @@ if (auditMode !== 'skip') {
     cd ${repoDir} && .venv/bin/python ${toolDir}/audit_runner.py${flags}
 
 Nó có thể lái máy thật và mất vài phút -- chờ cho xong, đừng bỏ ngang, đừng
-chạy lại. Báo "build chưa đổi" là ĐÚNG, không phải lỗi: triage cũ vẫn dùng được
-vì cùng build thì cùng kết quả.
+chạy lại. Báo "build và checklist đều chưa đổi" là ĐÚNG, không phải lỗi: triage
+cũ vẫn dùng được vì cả hai vế so sánh đều y nguyên.
 Nếu lệnh lỗi thì BÁO LẠI nguyên văn, KHÔNG tự sửa lệnh và chạy lại.
 
 Trả về: command đã chạy, exit code, toàn bộ output nó in ra, và trường "apps" --

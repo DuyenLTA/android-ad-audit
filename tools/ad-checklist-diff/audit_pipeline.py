@@ -66,9 +66,16 @@ def run_audit(
     package: str | None = None,
     apk_path: str | None = None,
     use_device: bool = True,
+    checklist: list[dict] | None = None,
 ) -> tuple[dict, list[str]]:
-    """Diff the checklist against a log and/or an APK. Returns (result, empty_filters)."""
-    checklist = fetch_checklist(sheet_url)
+    """Diff the checklist against a log and/or an APK. Returns (result, empty_filters).
+
+    `checklist` lets a caller that already fetched the sheet hand it over rather
+    than have it downloaded twice -- the skip decision has to read the checklist
+    before it knows whether to run at all.
+    """
+    if checklist is None:
+        checklist = fetch_checklist(sheet_url)
 
     empty_filters: list[str] = []
     trusted_values: set[str] = set()

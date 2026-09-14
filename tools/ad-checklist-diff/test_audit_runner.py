@@ -12,13 +12,18 @@ from audit_runner import (
 APPS = [{"package": "com.a", "gid": "1", "label": "A"}, {"package": "com.b", "gid": "2"}]
 SHEET = "https://docs.google.com/spreadsheets/d/ABC/edit"
 
+# What the sheet says, as parsed. Stubbed because the skip decision reads it
+# before deciding whether to audit at all.
+CHECKLIST = [{"section": "S", "label": "x", "value": "v", "alt_values": []}]
+
 RESULT = {
     "sections": {"S": [{"label": "x", "value": "v", "found": False, "note": "n"}]},
     "leftover_ids": [],
 }
 
 
-def _stub(monkeypatch, *, version="33", result=RESULT):
+def _stub(monkeypatch, *, version="33", result=RESULT, checklist=CHECKLIST):
+    monkeypatch.setattr(audit_runner, "fetch_checklist", lambda url: checklist)
     monkeypatch.setattr(audit_runner, "device_version_code", lambda pkg: version)
     monkeypatch.setattr(audit_runner, "base_apk", lambda pkg: (f"/tmp/{pkg}.apk", False))
     monkeypatch.setattr(audit_runner, "run_audit", lambda *a, **k: (result, []))
@@ -236,6 +241,7 @@ SAMPLE_ID = "ca-app-pub-3940256099942544/2247696110"
 
 
 def _audit_stubs(monkeypatch, result, saved, tmp_path):
+    monkeypatch.setattr(audit_runner, "fetch_checklist", lambda url: CHECKLIST)
     monkeypatch.setattr(audit_runner, "device_version_code", lambda pkg: 12)
     monkeypatch.setattr(audit_runner, "load", lambda pkg, **kw: None)
     monkeypatch.setattr(audit_runner, "base_apk", lambda pkg: (str(tmp_path / "x.apk"), False))
@@ -297,3 +303,92 @@ def test_wrong_build_gets_its_own_exit_code():
     assert audit_runner.exit_code_for([{"error": "boom"}]) == 1
     assert audit_runner.exit_code_for([{"delta": {"broke": ["r"]}}]) == 2
     assert audit_runner.exit_code_for([{"delta": {"broke": []}}]) == 0
+
+
+# --- Both halves of the comparison decide whether a re-run is needed ---------
+
+EDITED = [{"section": "S", "label": "x", "value": "v2", "alt_values": []}]
+
+
+def test_an_edited_checklist_reaudits_a_build_that_did_not_change(tmp_path, monkeypatch):
+    # The build is only half the comparison. The ads team edits the sheet without
+    # anybody reinstalling the app, and skipping on versionCode alone answers a
+    # question nobody asked -- serving the old verdict against a new checklist.
+    _stub(monkeypatch)
+    audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+
+    _stub(monkeypatch, checklist=EDITED)
+    again = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert "skipped" not in again
+
+
+def test_same_build_and_same_checklist_is_the_only_skip(tmp_path, monkeypatch):
+    _stub(monkeypatch)
+    audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    again = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert again["skipped"] == "build và checklist đều chưa đổi"
+
+
+def test_a_snapshot_from_before_digests_is_audited_once_more(tmp_path, monkeypatch):
+    # No digest means unknown, not unchanged: a run that read it as unchanged
+    # would skip on a guess, and every old snapshot would skip forever.
+    _stub(monkeypatch)
+    audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    snap = tmp_path / "com.a.json"
+    payload = json.loads(snap.read_text(encoding="utf-8"))
+    del payload["checklist_digest"]
+    snap.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert "skipped" not in audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+
+
+def test_an_edited_checklist_rediffs_the_stored_capture_instead_of_driving(tmp_path, monkeypatch):
+    # Nothing the sheet says can change what the app already did, so re-driving
+    # the phone for minutes would produce a log with a known answer.
+    _stub(monkeypatch)
+    captured = _stub_capture(monkeypatch)
+    capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert len(captured) == 1
+
+    _stub(monkeypatch, checklist=EDITED)
+    again = capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert again["reused_log"] is True
+    assert again["capture_log"] == str(tmp_path / "com.a-capture.log")
+    assert len(captured) == 1  # the phone was never touched
+
+
+def test_a_reused_capture_keeps_the_coverage_it_actually_had(tmp_path, monkeypatch):
+    # Which journeys reached Home is a property of the capture, not of the run
+    # re-reading it. Dropping it would have the page claim no capture stands
+    # behind these rows, and re-flag rows that were already explained.
+    _stub(monkeypatch)
+    _stub_capture(monkeypatch, reached=("new",), missed=("old",))
+    capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+
+    _stub(monkeypatch, checklist=EDITED)
+    capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    triage = json.loads((tmp_path / "com.a-triage.json").read_text(encoding="utf-8"))
+    assert triage["missed_home"] == ["old"]
+    assert triage["capture_reused_from"]
+
+
+def test_a_new_build_still_drives_the_phone(tmp_path, monkeypatch):
+    # The reuse path must not swallow the case it looks most like.
+    _stub(monkeypatch)
+    first = _stub_capture(monkeypatch)
+    capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+
+    _stub(monkeypatch, version="34", checklist=EDITED)
+    second = _stub_capture(monkeypatch)
+    capture_and_audit(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    assert len(first) == 1 and len(second) == 1
+
+
+def test_an_apk_only_run_calls_the_variant_unknown_not_clean(tmp_path, monkeypatch):
+    # Every dev-build signal lives in what the app printed at runtime, so a run
+    # with no log has nothing to read. Recording [] would read as "checked, this
+    # is a release build" -- the one claim such a run cannot make.
+    _stub(monkeypatch)
+    out = audit_one(APPS[0], SHEET, out_dir=tmp_path, snapshots_dir=tmp_path)
+    triage = json.loads(open(out["triage_path"], encoding="utf-8").read())
+    assert triage["dev_build_signals"] is None

@@ -52,3 +52,30 @@ def test_mode_label_falls_back_to_whatever_it_was_given():
     assert "lái máy" in mode_label("capture")
     assert mode_label("") == "không rõ"
     assert mode_label("weird") == "weird"
+
+
+# --- What the page may and may not claim about the build --------------------
+
+def test_a_run_with_no_log_says_the_variant_was_never_checked():
+    # Every dev-build signal lives in what the app printed at runtime. Saying
+    # nothing here reads as "checked, it is a release build".
+    warning = capture_warning({"missed_home": None, "dev_build_signals": None})
+    assert "build release hay build dev" in warning
+
+
+def test_a_capture_that_found_nothing_does_not_raise_the_question():
+    # [] is an answer: the log was read and named no dev-build signal.
+    warning = capture_warning({"missed_home": [], "dev_build_signals": []})
+    assert "build release hay build dev" not in warning
+
+
+def test_a_reused_capture_is_declared_on_the_page():
+    # The reader's default assumption is that the phone ran just now.
+    warning = capture_warning(
+        {"missed_home": [], "capture_reused_from": "2026-09-14T08:00:00+00:00"}
+    )
+    assert "dùng lại log" in warning and "2026-09-14" in warning
+
+
+def test_a_fresh_capture_says_nothing_about_reuse():
+    assert "dùng lại log" not in capture_warning({"missed_home": []})

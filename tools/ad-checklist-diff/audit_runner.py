@@ -37,6 +37,7 @@ from app_registry import (
     sheet_url_for,
 )
 from audit_pipeline import run_audit
+from check_ads import checklist_fingerprint, fetch_checklist
 from audit_snapshot import diff_results, load, save, triage
 from check_ads import DEFAULT_FILTERS
 from device_driver import capture_session
@@ -58,6 +59,50 @@ def unsettled_rows(triage_path: Path) -> int | None:
     return sum(len(rows) for rows in payload.get("triage", {}).values())
 
 
+def _previous_triage(path: Path) -> dict:
+    """Last run's triage, or an empty dict when there is none to read."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _skip_reason(previous: dict | None, version_code: str | None, digest: str) -> str | None:
+    """Why this app needs no new audit, or None to run one.
+
+    An audit compares two things, so both have to be unchanged for its verdict
+    to still stand. Keying only on versionCode answers half the question: the
+    ads team edits the sheet without anybody reinstalling the app, and a run
+    that skips on that reports a verdict reached against a checklist that has
+    since changed -- with nothing on the page to say so.
+
+    A snapshot written before digests existed carries none, which reads as
+    unknown rather than unchanged: the app is audited once more, and from then
+    on the question is answerable.
+    """
+    if not previous or not version_code:
+        return None
+    if previous.get("version_code") != version_code:
+        return None
+    if previous.get("checklist_digest") != digest:
+        return None
+    return "build và checklist đều chưa đổi"
+
+
+def _only_the_sheet_moved(previous: dict | None, version_code: str | None, digest: str) -> bool:
+    """Same build, different checklist -- so the capture on disk is still valid.
+
+    The log records what the app did; nothing the sheet says can change that.
+    Re-driving the phone for minutes to produce a log of the same build is work
+    with a known answer, so the stored capture is re-diffed instead.
+    """
+    if not previous or not version_code:
+        return False
+    if previous.get("version_code") != version_code:
+        return False
+    return previous.get("checklist_digest") not in (None, digest)
+
+
 def audit_one(
     app: dict,
     base_sheet: str,
@@ -68,6 +113,8 @@ def audit_one(
     missed_home: list[str] | None = None,
     snapshots_dir=None,
     allow_dev_build: bool = False,
+    checklist: list[dict] | None = None,
+    capture_reused_from: str | None = None,
 ) -> dict:
     """Audit a single app; returns a summary dict (never raises for one app)."""
     package = app["package"]
@@ -75,18 +122,18 @@ def audit_one(
     sheet = sheet_url_for(base_sheet, app["gid"])
     snap_kwargs = {"directory": snapshots_dir} if snapshots_dir else {}
 
+    if checklist is None:
+        checklist = fetch_checklist(sheet)
+    digest = checklist_fingerprint(checklist)
+
     version_code = device_version_code(package)
     previous = load(package, **snap_kwargs)
-    if (
-        not force
-        and previous
-        and version_code
-        and previous.get("version_code") == version_code
-    ):
+    skip = None if force else _skip_reason(previous, version_code, digest)
+    if skip:
         return {
             "package": package,
             "label": label,
-            "skipped": "build chưa đổi",
+            "skipped": skip,
             "version_code": version_code,
             "unsettled": unsettled_rows(out_dir / f"{package}-triage.json"),
         }
@@ -108,6 +155,7 @@ def audit_one(
         # tắt theo việc "có capture hay không", làm dòng Package name bị báo lệch
         # ở mọi lượt APK-only dù app đang cài ngay trên máy.
         use_device=True,
+        checklist=checklist,
     )
 
     # Stop here rather than report a score nobody should read. A checklist lists
@@ -131,7 +179,7 @@ def audit_one(
         }
 
     delta = diff_results(previous, result)
-    save(package, result, version_code, **snap_kwargs)
+    save(package, result, version_code, checklist_digest=digest, **snap_kwargs)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     # Distinct from the snapshot's own `<package>.json`: pointing both at one
@@ -160,6 +208,9 @@ def audit_one(
                 "version_code": version_code,
                 "audited_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "capture_log": capture_log,
+                # Set when this run re-diffed a capture an earlier run made
+                # of the same build, so the page can say the log is not fresh.
+                "capture_reused_from": capture_reused_from,
                 "missed_home": missed_home,
                 "build_ad_ids": build_ad_ids,
                 # Whether "not in build_ad_ids" means anything for this build.
@@ -169,7 +220,15 @@ def audit_one(
                 # Dấu hiệu đây là build dev: checklist ghi giá trị production,
                 # build dev phát ID mẫu, nên gần như dòng nào cũng lệch và mỗi
                 # dòng lệch đọc như sheet ghi sai.
-                "dev_build_signals": dev_build_signals(result),
+                #
+                # Mọi dấu hiệu đều nằm ở giá trị app *chạy ra*, nên lượt không
+                # capture thì không trả lời được câu hỏi này -- ghi None chứ
+                # không ghi [], vì [] đọc như "đã kiểm, build sạch". Chuỗi tĩnh
+                # trong APK không thay được: bản release của chính app này cũng
+                # chứa "Config variant dev", "setupAdjust", "sandbox" và cả ID
+                # mẫu ca-app-pub-3940256099942544 -- đó là format string và hằng
+                # số của SDK, build nào cũng có.
+                "dev_build_signals": signals if capture_log else None,
                 "apk_scan_applicable": (
                     scan_can_answer(set(build_ad_ids)) if build_ad_ids is not None else None
                 ),
@@ -221,18 +280,40 @@ def capture_and_audit(
     # The skip has to happen *before* the capture, otherwise the phone spends
     # minutes producing a log that `audit_one` would then decline to look at.
     snap_kwargs = {"directory": snapshots_dir} if snapshots_dir else {}
+    checklist = fetch_checklist(sheet_url_for(base_sheet, app["gid"]))
+    digest = checklist_fingerprint(checklist)
     version_code = device_version_code(package)
     previous = load(package, **snap_kwargs)
-    if (
-        not force
-        and previous
-        and version_code
-        and previous.get("version_code") == version_code
-    ):
-        return {"package": package, "label": label, "skipped": "build chưa đổi", "version_code": version_code}
+    skip = None if force else _skip_reason(previous, version_code, digest)
+    if skip:
+        return {"package": package, "label": label, "skipped": skip, "version_code": version_code}
 
     out_dir.mkdir(parents=True, exist_ok=True)
     log_path = out_dir / f"{package}-capture.log"
+
+    # Same build, edited checklist. Driving the phone again would produce a log
+    # of the same app doing the same thing; only the comparison has changed, and
+    # that is a second of work against minutes of capture. Carry the previous
+    # run's coverage forward with it -- which journeys reached Home is a property
+    # of the capture, not of the run re-reading it, and dropping it would have
+    # the page claim no capture stands behind these rows.
+    if not force and _only_the_sheet_moved(previous, version_code, digest) and log_path.exists():
+        prior = _previous_triage(out_dir / f"{package}-triage.json")
+        summary = audit_one(
+            app,
+            base_sheet,
+            out_dir=out_dir,
+            force=True,
+            capture_log=str(log_path),
+            missed_home=prior.get("missed_home"),
+            snapshots_dir=snapshots_dir,
+            allow_dev_build=allow_dev_build,
+            checklist=checklist,
+            capture_reused_from=prior.get("audited_at"),
+        )
+        summary["capture_log"] = str(log_path)
+        summary["reused_log"] = True
+        return summary
     splash_tap = app.get("splash_tap")
     passes = capture_session(
         package,
@@ -270,6 +351,7 @@ def capture_and_audit(
         missed_home=missed_home,
         snapshots_dir=snapshots_dir,
         allow_dev_build=allow_dev_build,
+        checklist=checklist,
     )
     summary["capture_log"] = str(log_path)
     summary["missed_home"] = missed_home
@@ -379,6 +461,9 @@ def print_summary(results: list[dict]) -> None:
                 flags.append(f"{len(delta['new_leftover_ids'])} ID lạ mới")
             state = ", ".join(flags) if flags else "không đổi"
             print(f"  [{r['score']}] {name}: {state}{_unsettled_note(r)}")
+            if r.get("reused_log"):
+                # Nói ra, vì người đọc mặc định tưởng lượt capture vừa chạy.
+                print("         checklist đổi, build chưa đổi -- dùng lại log capture đã có")
             if r.get("missed_home"):
                 # A journey that never reached Home captured less than it should
                 # have, so its "chưa thấy trong log" rows are not evidence of a bug.
