@@ -63,8 +63,20 @@ cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add
 
 ## 2. Gọi workflow
 
-Gọi Workflow tool với `scriptPath: "<repo>/.claude/workflows/audit-fanout.mjs"`
-và args:
+Workflow tool **chỉ nhận `scriptPath` nằm trong working directory của phiên**,
+mà command này chạy từ đâu cũng được — nên trỏ thẳng vào `<repo>/.claude/...`
+sẽ hỏng đúng những lượt chạy ngoài repo. Copy script ra chỗ phiên đọc được
+trước đã, **luôn luôn**, đừng chờ nó báo lỗi rồi mới vòng:
+
+```
+cp <repo>/.claude/workflows/audit-fanout.mjs <scratchpad>/audit-fanout.mjs
+```
+
+`<scratchpad>` là thư mục scratchpad của phiên (system prompt có nêu). Copy
+không đổi hành vi gì: `repoDir` và `toolDir` truyền vào là đường dẫn tuyệt đối,
+nên script chạy ở đâu cũng đọc đúng repo.
+
+Rồi gọi Workflow tool với `scriptPath: "<scratchpad>/audit-fanout.mjs"` và args:
 
 - `apps`: danh sách package lấy ở bước 1. Bắt buộc, không bao giờ để rỗng.
 - `repoDir`: `<repo>`
@@ -72,8 +84,9 @@ và args:
 - `audit`: `"capture"` mặc định · `"apk"` nếu có cờ `--apk` · `"skip"` nếu có cờ `--skip`
 - `force`: `true` nếu có cờ `--force`
 
-Dùng `scriptPath` chứ đừng dùng `name: "audit-fanout"`: tên chỉ phân giải được
-khi phiên mở đúng tại repo root, còn command này chạy từ đâu cũng phải được.
+Đừng dùng `name: "audit-fanout"`: tên chỉ phân giải được khi phiên mở đúng tại
+repo root. Cũng đừng đọc file rồi truyền vào `script` — script dài vài trăm dòng,
+lượt nào cũng nhét nguyên nó vào hội thoại là tốn vô ích.
 
 Mặc định `capture` sẽ lái máy thật và chạy `pm clear` trên app — đó là chế độ
 hoạt động bình thường của tool, không phải thao tác nguy hiểm, cứ chạy. Có nói
