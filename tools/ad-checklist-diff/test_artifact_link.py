@@ -44,3 +44,37 @@ def test_missing_report_or_timestamp_is_not_reported_stale(tmp_path):
     report.write_text("x", encoding="utf-8")
     assert is_stale({"url": "u"}, report) is False
     assert is_stale({"url": "u", "published_at": "garbage"}, report) is False
+
+
+def test_each_app_keeps_its_own_link(tmp_path):
+    from artifact_link import read_app_link, write_app_link
+
+    links = tmp_path / "links.json"
+    write_app_link("com.a", "https://x/a", links_file=links)
+    write_app_link("com.b", "https://x/b", links_file=links)
+
+    assert read_app_link("com.a", links_file=links) == "https://x/a"
+    assert read_app_link("com.b", links_file=links) == "https://x/b"
+
+
+def test_republishing_an_app_replaces_its_link(tmp_path):
+    from artifact_link import read_app_link, write_app_link
+
+    links = tmp_path / "links.json"
+    write_app_link("com.a", "https://x/old", links_file=links)
+    write_app_link("com.a", "https://x/new", links_file=links)
+    assert read_app_link("com.a", links_file=links) == "https://x/new"
+
+
+def test_an_app_never_published_has_no_link(tmp_path):
+    # The caller publishes a fresh page rather than guessing at a URL.
+    from artifact_link import read_app_link
+
+    assert read_app_link("com.nope", links_file=tmp_path / "missing.json") is None
+
+
+def test_a_machine_with_no_browser_says_so(monkeypatch):
+    import artifact_link
+
+    monkeypatch.setattr(artifact_link.webbrowser, "open", lambda url: (_ for _ in ()).throw(OSError()))
+    assert artifact_link.open_in_browser("https://x") is False

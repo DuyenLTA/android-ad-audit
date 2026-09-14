@@ -12,14 +12,22 @@ without the link ever changing.
 
 `published_at` is compared against the report file's mtime so the GUI can say
 when the artifact is older than the run just finished.
+
+Each audited app has its own artifact, so those URLs are kept per package in
+`artifact-links.json`. Without that record a later run has no way to know an app
+already has a page, and publishes a second one -- the shared link people already
+have then quietly stops being the current report.
 """
+import argparse
 import json
 import os
 import sys
+import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
 
 LINK_FILE = Path(__file__).parent / "artifact-link.json"
+LINKS_FILE = Path(__file__).parent / "artifact-links.json"
 
 
 def read_link(link_file: Path | None = None) -> dict | None:
@@ -53,9 +61,69 @@ def is_stale(link: dict, report_path: Path) -> bool:
     return report_mtime > published
 
 
+def read_app_links(links_file: Path | None = None) -> dict:
+    """Every app's artifact URL, keyed by package."""
+    links_file = links_file or LINKS_FILE
+    try:
+        return json.loads(links_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def read_app_link(package: str, links_file: Path | None = None) -> str | None:
+    """The page this app already has, so a rerun updates it instead of forking."""
+    return (read_app_links(links_file).get(package) or {}).get("url")
+
+
+def write_app_link(package: str, url: str, links_file: Path | None = None) -> dict:
+    links_file = links_file or LINKS_FILE
+    links = read_app_links(links_file)
+    links[package] = {
+        "url": url,
+        "published_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    links_file.write_text(
+        json.dumps(links, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return links[package]
+
+
+def open_in_browser(url: str) -> bool:
+    """Open the page. False when there is no browser to open it in."""
+    try:
+        return webbrowser.open(url)
+    except Exception:
+        return False
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Ghi / mở link artifact")
+    parser.add_argument("url", nargs="?", help="URL vừa publish")
+    parser.add_argument("--package", help="ghi link cho riêng app này")
+    parser.add_argument("--show", action="store_true", help="in link đã lưu")
+    parser.add_argument("--open", action="store_true", help="mở link trong trình duyệt")
+    args = parser.parse_args()
+
+    if args.package:
+        if args.url:
+            write_app_link(args.package, args.url)
+        url = args.url or read_app_link(args.package)
+        if not url:
+            raise SystemExit(f"Chưa có link nào cho {args.package}")
+        print(url)
+        if args.open and not open_in_browser(url):
+            print("Không mở được trình duyệt ở máy này.", file=sys.stderr)
+        return
+
+    if args.show:
+        link = read_link()
+        print(link["url"] if link else "(chưa publish lần nào)")
+        return
+    if not args.url:
+        raise SystemExit("usage: python artifact_link.py [--package <pkg>] <artifact-url>")
+    print(write_link(args.url))
+
+
 if __name__ == "__main__":
-    # `python artifact_link.py <url>` -- how Claude records the URL after
-    # publishing the report file.
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: python artifact_link.py <artifact-url>")
-    print(write_link(sys.argv[1]))
+    main()

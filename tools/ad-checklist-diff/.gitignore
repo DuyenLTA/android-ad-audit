@@ -3,6 +3,7 @@ __pycache__/
 streamlit.log
 static/
 artifact-link.json
+artifact-links.json
 snapshots/
 out/
 apps.json

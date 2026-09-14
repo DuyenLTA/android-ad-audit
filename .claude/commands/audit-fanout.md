@@ -110,9 +110,27 @@ Với mỗi app vừa chạy:
 
    Builder mặc định đọc `snapshots/` và ghi `out/` cạnh chính nó, nên đường dẫn
    trong lệnh trên tính từ `<repo>`.
-3. Publish `<repo>/tools/ad-checklist-diff/out/<package>-artifact.html` bằng
-   Artifact tool. App nào đã có artifact từ lượt trước thì truyền `url` của nó
-   để giữ nguyên link, đừng tạo trang mới.
+3. Trước khi publish, hỏi xem app này đã có trang chưa:
+
+   ```
+   cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
+     --package <package> --show
+   ```
+
+   Có link thì truyền vào `url` khi publish để giữ nguyên trang — người ta đã
+   chia sẻ link đó rồi, tạo trang mới là link cũ lặng lẽ thành bản cũ. Chưa có
+   thì publish mới.
+
+4. Publish `<repo>/tools/ad-checklist-diff/out/<package>-artifact.html` bằng
+   Artifact tool, rồi ghi lại link và **mở luôn**:
+
+   ```
+   cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
+     --package <package> --open <url vừa publish>
+   ```
+
+   Lệnh này vừa lưu link cho lượt sau vừa bật trình duyệt. Máy không có màn hình
+   thì nó báo ra stderr và vẫn lưu link — không coi đó là lỗi của lượt chạy.
 
 Trang phải mở đầu bằng thống kê khớp/lệch rồi mới tới phần điều tra — builder
 lo sẵn phần đó. Một báo cáo mở đầu bằng đúng một dòng lệch đọc như tool chỉ tìm
