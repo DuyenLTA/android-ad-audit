@@ -103,10 +103,18 @@ def drive_to_home(
             visited.append(short)
             last_short = short
 
+        rule = rule_for(activity, rules)
+
         # An ad tap can hand the device to another app entirely. That app's own
         # screens must never be driven, and its "MainActivity" must never be
         # mistaken for ours -- come back and carry on.
-        if package and focused_pkg and focused_pkg != package:
+        #
+        # Exception: a screen whose rule is marked `system` is drawn by another
+        # package *on behalf of* this app -- the runtime permission dialog. It
+        # sits on top of our own activity, so relaunching does not dismiss it;
+        # it just puts the dialog straight back, and the run loops there until
+        # it times out. Those screens are handled instead of fled.
+        if package and focused_pkg and focused_pkg != package and not (rule and rule.get("system")):
             actions.append(f"{short}: ngoài app ({focused_pkg}) -- mở lại app")
             launch(package, run=run)
             sleep(POLL_SECONDS)
@@ -116,7 +124,6 @@ def drive_to_home(
             reached_home = True
             break
 
-        rule = rule_for(activity, rules)
         if rule:
             key = (short, visits.get(short, 1))
             index = progress.get(key, 0)

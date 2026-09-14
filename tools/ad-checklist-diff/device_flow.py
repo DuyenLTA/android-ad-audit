@@ -73,7 +73,32 @@ PAYWALL_STEPS = [
 ]
 PAYWALL_REPEAT_FROM = 1
 
+# Android 13+ asks for the notification permission on first open. The dialog is
+# drawn by `com.android.permissioncontroller`, not by the app, so the driver's
+# "focus left the app -- come back" guard used to relaunch the app underneath
+# it; the dialog simply reappeared, and the run spent its whole timeout in that
+# loop without ever reaching Home. `system: True` below marks the screen as one
+# that legitimately belongs to another package.
+#
+# The button labels are localised, so they are matched by resource-id; the
+# `_foreground_` variant is what location-style prompts use on other builds.
+# Allow rather than deny: a denied prompt comes back on the next cold start,
+# and the returning-user pass would pay for it a second time.
+PERMISSION_STEPS = [
+    {"tap": {"resource_id": "id/permission_allow_button"}},
+    {"tap": {"resource_id": "id/permission_allow_foreground_button"}},
+    {"tap": {"text": "Allow"}},
+]
+PERMISSION_REPEAT_FROM = 0
+
 DEFAULT_RULES: list[dict] = [
+    # First: a permission dialog can appear over any of the screens below.
+    {
+        "match": "GrantPermissionsActivity",
+        "steps": PERMISSION_STEPS,
+        "repeat_from": PERMISSION_REPEAT_FROM,
+        "system": True,
+    },
     {"match": "Language", "steps": LANGUAGE_STEPS},
     {"match": "OnboardingActivity", "steps": ONBOARDING_STEPS},
     {"match": "QuestionActivity", "steps": QUESTION_STEPS, "repeat_from": QUESTION_REPEAT_FROM},

@@ -26,8 +26,10 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import sys
 
+from check_ads import DEFAULT_FILTERS
 from device_flow import DEFAULT_HOME_MATCH
 from device_navigator import drive_to_home, force_stop, launch, splash_logo_spam, wipe_app_data
 from device_ui import adb_run
@@ -35,6 +37,59 @@ from device_ui import adb_run
 PASS_NEW_USER = "new"
 PASS_RETURNING = "old"
 DEFAULT_PASSES = (PASS_NEW_USER, PASS_RETURNING)
+
+# Sitting on Home exists to let its own placements request. How long that takes
+# was never measured -- 12 seconds was a round number. Measured on device, every
+# trusted line arrived within 2.2s of reaching Home and nothing followed for the
+# next 45. But that run came back "No fill" on every unit, which is the fastest
+# an ad request can resolve; a run that actually fills will log later.
+#
+# So the constant is not lowered. The wait ends when the log goes quiet instead:
+# short whenever the app is done, and still capped at the old 12s, so the worst
+# case is exactly what it was before.
+HOME_MIN_SECONDS = 3
+HOME_QUIET_SECONDS = 4
+HOME_DWELL_CAP = 12
+HOME_POLL_SECONDS = 0.5
+
+
+def wait_for_ad_quiet(
+    path: str,
+    *,
+    minimum: float = HOME_MIN_SECONDS,
+    quiet: float = HOME_QUIET_SECONDS,
+    cap: float = HOME_DWELL_CAP,
+    filters=DEFAULT_FILTERS,
+    sleep=time.sleep,
+    now=time.monotonic,
+) -> float:
+    """Stay on Home until its placements stop logging. Returns seconds waited.
+
+    Only the lines the audit actually reads count as activity -- logcat never
+    falls silent on its own, so watching the file grow would wait out the cap
+    every time.
+    """
+    try:
+        stream = open(path, encoding="utf-8", errors="replace")
+    except OSError:
+        # No capture file to watch: fall back to the fixed wait rather than
+        # cutting Home's placements short.
+        sleep(cap)
+        return cap
+
+    started = now()
+    last_line_at = started
+    with stream:
+        stream.seek(0, os.SEEK_END)
+        while True:
+            elapsed = now() - started
+            if elapsed >= cap:
+                return elapsed
+            if elapsed >= minimum and now() - last_line_at >= quiet:
+                return elapsed
+            if any(flt in line for line in stream.readlines() for flt in filters):
+                last_line_at = now()
+            sleep(HOME_POLL_SECONDS)
 
 
 def _adb(serial: str | None):
@@ -73,7 +128,17 @@ def capture_pass(
     try:
         launch(package, run=run)
         tapped = splash_logo_spam(tap_xy, package=package, run=run)
-        result = drive_to_home(package=package, home_match=home_match, timeout=timeout, run=run)
+        # dwell=0: the wait on Home is done here instead, where the capture file
+        # is in hand and can say when the app has actually finished requesting.
+        result = drive_to_home(
+            package=package, home_match=home_match, timeout=timeout, dwell=0, run=run
+        )
+        if result["reached_home"]:
+            log_file.flush()
+            path = getattr(log_file, "name", None)
+            result["dwell_seconds"] = (
+                round(wait_for_ad_quiet(path), 1) if path else HOME_DWELL_CAP
+            )
     finally:
         # Một `adb logcat` sống sót vẫn giữ file descriptor và ghi tiếp vào file
         # capture hàng chục phút sau khi lượt chạy kết thúc -- lẫn cả log của app
@@ -128,7 +193,10 @@ def capture_session(
             print("  màn đã đi qua: " + " -> ".join(result["visited"]))
             for action in result["actions"]:
                 print(f"    {action}")
-            print(f"  tới Home: {'có' if result['reached_home'] else 'KHÔNG (timeout)'}")
+            reached = "có" if result["reached_home"] else "KHÔNG (timeout)"
+            waited = result.get("dwell_seconds")
+            note = f" -- đợi thêm {waited}s tới khi log ads im" if waited is not None else ""
+            print(f"  tới Home: {reached}{note}")
 
         with open(out_path, "w", encoding="utf-8") as out:
             for part in parts:
