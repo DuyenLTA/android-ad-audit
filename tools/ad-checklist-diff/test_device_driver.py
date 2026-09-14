@@ -135,3 +135,66 @@ def test_every_pass_starts_from_an_empty_log_buffer(tmp_path, monkeypatch):
     device_driver.capture_session("com.x", str(tmp_path / "capture.log"))
     clears = [c for c in calls if c == ["logcat", "-c"]]
     assert len(clears) == len(device_driver.DEFAULT_PASSES)
+
+
+def test_each_pass_writes_somewhere_an_orphan_cannot_reach(tmp_path, monkeypatch):
+    # A killed run leaves `adb logcat` alive holding the capture file open. It
+    # kept appending for half an hour -- other apps' logs included -- into the
+    # file the audit then read.
+    import device_driver
+
+    written = []
+
+    def fake_pass(package, log_file, **kwargs):
+        written.append(log_file.name)
+        log_file.write(f"log của {kwargs['fresh']}\n")
+        return {"reached_home": True, "visited": [], "actions": []}
+
+    monkeypatch.setattr(device_driver, "capture_pass", fake_pass)
+    out = tmp_path / "capture.log"
+    device_driver.capture_session("com.a", str(out))
+
+    assert len(written) == 2
+    assert all(str(out) != path for path in written)  # không lượt nào ghi thẳng
+    assert out.read_text(encoding="utf-8").count("log của") == 2  # ghép đủ
+
+
+def test_a_logcat_that_ignores_terminate_is_killed(monkeypatch, tmp_path):
+    import subprocess as sp
+
+    import device_driver
+
+    killed = []
+
+    class Stubborn:
+        # subprocess.run() opens Popen as a context manager, and patching the
+        # module attribute reaches every caller -- so the stub has to behave.
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def terminate(self):
+            pass
+
+        def kill(self):
+            killed.append(True)
+
+        def wait(self, timeout=None):
+            if not killed:
+                raise sp.TimeoutExpired("adb logcat", timeout)
+
+    monkeypatch.setattr(device_driver, "adb_run", lambda *a, **k: "")
+    monkeypatch.setattr(device_driver.subprocess, "Popen", lambda *a, **k: Stubborn())
+    monkeypatch.setattr(device_driver, "wipe_app_data", lambda *a, **k: None)
+    monkeypatch.setattr(device_driver, "force_stop", lambda *a, **k: None)
+    monkeypatch.setattr(device_driver, "launch", lambda *a, **k: None)
+    monkeypatch.setattr(device_driver, "splash_logo_spam", lambda *a, **k: True)
+    monkeypatch.setattr(
+        device_driver, "drive_to_home",
+        lambda **k: {"reached_home": True, "visited": [], "actions": []},
+    )
+    with open(tmp_path / "p.log", "w", encoding="utf-8") as f:
+        device_driver.capture_pass("com.a", f, fresh=False)
+    assert killed == [True]

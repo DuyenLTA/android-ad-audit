@@ -22,7 +22,10 @@ Measured facts this rests on:
   attempted once.
 """
 import argparse
+import os
+import shutil
 import subprocess
+import tempfile
 import sys
 
 from device_flow import DEFAULT_HOME_MATCH
@@ -72,8 +75,15 @@ def capture_pass(
         tapped = splash_logo_spam(tap_xy, package=package, run=run)
         result = drive_to_home(package=package, home_match=home_match, timeout=timeout, run=run)
     finally:
+        # Một `adb logcat` sống sót vẫn giữ file descriptor và ghi tiếp vào file
+        # capture hàng chục phút sau khi lượt chạy kết thúc -- lẫn cả log của app
+        # khác. Audit đọc chính file đó, nên phải chắc chắn nó chết.
         proc.terminate()
-        proc.wait(timeout=10)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=10)
     result["splash_tap"] = tapped
     return result
 
@@ -90,28 +100,40 @@ def capture_session(
 ) -> list[dict]:
     """Run the requested journeys into one capture file."""
     results = []
-    with open(out_path, "w", encoding="utf-8") as log_file:
-        for name in passes:
+    # Mỗi lượt ghi ra file tạm riêng, xong mới ghép vào `out_path`. Nếu lượt
+    # trước bị kill và để lại logcat mồ côi, nó vẫn đang ghi vào file tạm cũ --
+    # không chạm được vào file kết quả, nên capture này không bị lẫn.
+    parts = []
+    with tempfile.TemporaryDirectory(prefix="adcheck-capture-") as workdir:
+        for index, name in enumerate(passes):
+            part = os.path.join(workdir, f"{index}-{name}.log")
+            parts.append(part)
             fresh = name == PASS_NEW_USER
             if fresh:
                 print(f"[{name}] pm clear {package} -- xoá dữ liệu app để tạo lại user mới")
             else:
                 print(f"[{name}] mở lại app, không xoá dữ liệu")
-            result = capture_pass(
-                package,
-                log_file,
-                fresh=fresh,
-                serial=serial,
-                timeout=timeout,
-                home_match=home_match,
-                tap_xy=tap_xy,
-            )
+            with open(part, "w", encoding="utf-8") as log_file:
+                result = capture_pass(
+                    package,
+                    log_file,
+                    fresh=fresh,
+                    serial=serial,
+                    timeout=timeout,
+                    home_match=home_match,
+                    tap_xy=tap_xy,
+                )
             result["pass"] = name
             results.append(result)
             print("  màn đã đi qua: " + " -> ".join(result["visited"]))
             for action in result["actions"]:
                 print(f"    {action}")
             print(f"  tới Home: {'có' if result['reached_home'] else 'KHÔNG (timeout)'}")
+
+        with open(out_path, "w", encoding="utf-8") as out:
+            for part in parts:
+                with open(part, encoding="utf-8", errors="replace") as chunk:
+                    shutil.copyfileobj(chunk, out)
     return results
 
 

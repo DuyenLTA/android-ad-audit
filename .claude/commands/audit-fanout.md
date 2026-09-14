@@ -22,48 +22,32 @@ gọi — đường dẫn tương đối là cách chắc chắn nhất để n�
 
 ## 1. Đọc registry
 
-Không nêu tên app trong `$ARGUMENTS` thì lấy hết registry:
+Không nêu app trong `$ARGUMENTS` thì lấy hết registry:
 `<repo>/tools/ad-checklist-diff/apps.json`.
 
-Có nêu tên thì **đừng tự so chuỗi** — chạy, theo thứ tự này:
+Có nêu thì **chỉ nhận package name** — chuỗi dạng `com.abc.xyz`, từ 3 đoạn trở
+lên. Đừng đoán từ tên app: khớp chuỗi con trên 85 app đang cài là kiểu tra cứu
+trông như hiểu ý nhưng hay ra nhầm app, mà chạy nhầm app thì lượt capture
+`pm clear` xoá dữ liệu của app không liên quan.
+
+Người dùng đưa thứ không phải package name thì **dừng**, nói rõ cần package
+name, và gợi ý cách lấy:
 
 ```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py "<tên>"
 cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device "<tên>"
 ```
 
-Cái đầu tra registry (tức thì). Exit 1 thì chạy cái thứ hai: nó quét **mọi app
-đang cài trên máy** và khớp theo tên hiện trên icon — lần đầu ~15 giây cho cả
-máy, sau đó có cache nên vài giây.
+Lệnh đó để **người** đọc rồi tự chọn, không phải để bạn tự chọn giúp.
 
-Người ta gõ cái họ nhìn thấy: "Nexus", không phải nickname nội bộ "AI Art", càng
-không phải package id.
-
-Thêm `--add` vào lệnh thứ hai để app tìm được tự vào registry:
+Package chưa có trong registry thì thêm vào, `gid` đọc từ sheet chứ không hỏi:
 
 ```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<tên>"
+cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<package>"
 ```
 
-`gid` không phải hỏi: mỗi tab trong sheet có dòng `Package name` của chính nó,
-nên tab nào thuộc app nào là **đọc được**, không đoán. Tên tab là mã dự án, đừng
-cố khớp nó với tên app.
-
-Dòng in ra có `gid=<số>` là xong, chạy tiếp. Hai trường hợp phải **dừng và hỏi
-người dùng**, đừng tự chọn:
-
-- `gid=? (… nhiều tab cùng khai app này)` — sheet có 2 tab cho cùng app, chọn
-  bừa là đối chiếu nhầm checklist
-- `gid=? (sheet không có tab nào khai package này)` — app đang cài nhưng chưa có
-  checklist; không có gì để đối chiếu
-
-Theo exit code:
-
-- `0` — đúng một app, chạy nó
-- `1` — không khớp. **Dừng**, in nguyên danh sách nó gợi ý. Đừng đoán, và tuyệt
-  đối đừng chạy cả registry thay thế: lượt capture mặc định `pm clear` app, chạy
-  nhầm app là xoá dữ liệu của app không liên quan
-- `2` — nhiều app khớp. **Dừng**, liệt kê ra và hỏi người dùng chọn
+In ra `gid=<số>` là xong. Còn `gid=?` (nhiều tab cùng khai app này, hoặc sheet
+chưa có tab nào cho nó) thì **dừng và hỏi** — chọn bừa là đối chiếu nhầm
+checklist.
 
 ## 2. Gọi workflow
 
