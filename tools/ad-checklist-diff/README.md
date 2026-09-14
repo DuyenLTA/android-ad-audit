@@ -64,6 +64,22 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   Facebook app id/client token and every ad unit ID, so publishing sends that
   to claude.ai (artifacts are private unless shared).
 
+### Link artifact theo từng app
+
+GUI dùng một link cố định cho `static/adcheck-report.html`. Lượt fan-out thì mỗi
+app một trang riêng, nên link lưu theo package:
+
+```
+python artifact_link.py --package <pkg> <url>          # ghi lại sau khi publish
+python artifact_link.py --package <pkg> --show         # lượt sau publish đè vào đúng trang
+python artifact_link.py --package <pkg> --open <url>   # ghi xong bật trình duyệt luôn
+```
+
+Không lưu thì lượt sau không biết app đã có trang và sẽ publish thêm một trang
+nữa — ai đang giữ link cũ sẽ đọc bản không còn được cập nhật. File
+`artifact-links.json` nằm trong `.gitignore`: nó là trạng thái của máy, không
+phải của repo.
+
 ## Setup
 
 ```
