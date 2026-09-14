@@ -72,8 +72,40 @@ nguyên làm lưới chặn cuối. Kết quả trả về thêm trường `stop
 (`home` / `stuck` / `timeout`) để bản tóm tắt nói đúng lý do thay vì gọi mọi
 thất bại là timeout.
 
+**Cập nhật 2026-09-14 — đã đo `DEFAULT_DWELL_SECONDS`.** Máy `R83L1111AFT`
+(SM_A075F, 720x1600). Chạy tới Home với `dwell=0` rồi quan sát thêm 45s, đo
+offset từng dòng log tin cậy so với lúc chạm Home:
+
+| | lượt new | lượt old |
+|---|---|---|
+| dòng tin cậy sau Home | 23 | 23 |
+| dòng cuối cùng | +2,2s | +2,1s |
+| còn dòng nào trong khoảng +4s → +45s | không | không |
+
+Nhưng **không hạ hằng số**: cả lượt đo đều trả `No fill` trên mọi ad unit, tức
+là đường về nhanh nhất một request có thể đi. Lượt nào fill thật sẽ log muộn
+hơn, mà mẫu đo không có lượt nào như vậy.
+
+Thay vào đó dwell kết thúc khi log lặng: tối thiểu 3s, lặng 4s thì thôi, trần
+vẫn đúng 12s cũ nên trường hợp xấu nhất không đổi. Đo lại trên máy: **7,0s và
+6,5s** thay cho 12s+12s.
+
+Phân rã một lượt điều hướng (lượt new, 86,8s tới Home, đo từng lời gọi adb):
+
+| hạng mục | giây | lần | tb |
+|---|---|---|---|
+| sleep (poll 2s + wait khai báo + dwell) | 48,0 | 19 | 2,53 |
+| `uiautomator dump` | 32,4 | 12 | 2,70 |
+| spam tap splash | 1,6 | 3 | 0,55 |
+| `dumpsys window` | 1,6 | 19 | 0,09 |
+| còn lại (tap, rm, monkey, swipe, pm clear, wm size) | 2,6 | 29 | — |
+
 ## Chưa giải quyết
 
-- `DEFAULT_DWELL_SECONDS = 12` chưa được đo lại bao giờ; có thể thừa hoặc thiếu.
 - `STUCK_POLLS = 15` chọn theo suy luận, chưa đo trên máy thật: chưa có lượt nào
   kẹt thật sự để biết 30s rỗi là đủ rộng hay đã quá rộng.
+- Dwell mới chưa gặp lượt nào ad **fill** thật. Ngưỡng lặng 4s đang dựa trên
+  toàn mẫu `No fill`; gặp lượt fill thì phải đo lại xem 4s có còn đủ.
+- 32s/lượt là sleep poll (`POLL_SECONDS = 2` x 16 vòng). Đã A/B một lần, kết quả
+  118,9s vs 120,6s — nằm trong nhiễu, nên đã hoàn nguyên. Đừng thử lại nếu
+  không có cách đo tách bạch hơn.
