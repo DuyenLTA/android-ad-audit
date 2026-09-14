@@ -97,10 +97,26 @@ trong lời báo là đã capture lại, đừng dừng lại hỏi chọn chế
 Với mỗi app vừa chạy:
 
 1. Viết mảnh HTML phần điều tra vào `<repo>/tools/ad-checklist-diff/out/<package>-findings.html`
-   và phần ghi chú + câu hỏi chưa giải quyết vào `…/out/<package>-notes.html`,
-   dựa trên `confirmed` / `disputed` / `unresolved` mà workflow trả về. Chỉ viết những gì agent
-   thật sự chứng minh được, kèm trích dẫn nguồn (tên file + chuỗi tìm thấy hoặc
-   không thấy). Không có finding nào thì bỏ qua hai file này.
+   và phần việc-cần-làm vào `…/out/<package>-notes.html`, dựa trên `confirmed` /
+   `disputed` / `unresolved` mà workflow trả về. Không có finding nào thì bỏ qua
+   hai file này.
+
+   **Người đọc là ads-team, không phải người viết tool.** Họ cần biết lệch ở đâu:
+   dòng nào, sheet ghi gì, build đang chạy gì. Không cần xem lại đường đi của lập
+   luận. Cụ thể:
+
+   - Mỗi dòng lệch trình bày bằng khối `.duel` hai cột — `side--sheet` (ID sheet
+     ghi, gạch ngang) cạnh `side--build` (ID build đang chạy), mỗi bên một câu
+     ngắn nói vì sao. Nhiều ID cùng một kiểu lệch thì dùng một bảng.
+   - **KHÔNG** trích số dòng log, PID, tên hàm SDK, hay chuỗi `capture.log:NNNNN`.
+     Bằng chứng chi tiết đã nằm trong báo cáo markdown ở bước 4 — trang artifact
+     không phải chỗ chép lại nó.
+   - **KHÔNG** viết mục "phản-giả thuyết đã loại", "câu hỏi chưa giải quyết", hay
+     kể lại việc agent đã kiểm những gì. Đó là chuyện nội bộ của lượt chạy.
+   - `notes.html` chỉ gồm việc cần làm — thường đúng một câu "cần ads-team xác
+     nhận X". Thêm tối đa một câu nữa nếu lượt chạy có cảnh báo thật sự đổi cách
+     đọc kết quả (ví dụ tool chỉ đối chiếu chiều sheet → build, nên khớp hết
+     không có nghĩa là không còn ID ngoài checklist).
 2. Dựng trang:
 
    ```
