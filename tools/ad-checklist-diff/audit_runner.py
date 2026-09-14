@@ -28,6 +28,7 @@ from pathlib import Path
 
 from apk_source import apk_ad_ids, base_apk, cache_path, device_version_code
 from apk_verifier import scan_can_answer
+from build_identity import dev_build_signals
 from app_registry import (
     DEFAULT_REGISTRY,
     load_apps,
@@ -144,6 +145,10 @@ def audit_one(
                 # False when the APK embeds only the SDK's sample ids, i.e. the
                 # real ones arrive at runtime -- then absence is not evidence and
                 # every ad-id row has to be settled from the log instead.
+                # Dấu hiệu đây là build dev: checklist ghi giá trị production,
+                # build dev phát ID mẫu, nên gần như dòng nào cũng lệch và mỗi
+                # dòng lệch đọc như sheet ghi sai.
+                "dev_build_signals": dev_build_signals(result),
                 "apk_scan_applicable": (
                     scan_can_answer(set(build_ad_ids)) if build_ad_ids is not None else None
                 ),

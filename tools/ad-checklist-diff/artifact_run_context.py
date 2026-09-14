@@ -8,6 +8,11 @@ report path have to be passed in, because nothing on disk records them.
 The capture warning matters most: a journey that stopped at onboarding makes
 every "chưa thấy trong log" row meaningless, and a reader who cannot see that
 warning has no way to know the page is built on a half-finished capture.
+
+Every condition warned about here is one the triage already records. A tool that
+detects a condition and stays quiet about it pushes the work onto whoever reads
+the number afterwards -- and that reader is looking at the page, not at the
+handbook where it used to be written down.
 """
 import html
 
@@ -54,6 +59,16 @@ def capture_warning(triage: dict | None) -> str:
         return ""
 
     warnings = []
+
+    signals = triage.get("dev_build_signals") or []
+    if signals:
+        warnings.append(
+            "<b>Nghi đang audit build dev</b> — " + "; ".join(
+                html.escape(str(s)) for s in signals
+            ) + ". Checklist ghi giá trị production, nên phần lớn dòng lệch ở đây "
+            "có thể chỉ là sai build chứ không phải sheet ghi sai."
+        )
+
     if "missed_home" in triage:
         missed = triage["missed_home"]
         if missed is None:
@@ -77,6 +92,16 @@ def capture_warning(triage: dict | None) -> str:
         names = ", ".join(html.escape(str(f)) for f in empty)
         warnings.append(
             f"Filter <b>{names}</b> không khớp dòng log nào — cả vùng đó chưa được capture."
+        )
+
+    # False means the APK embeds no real ad unit id, so a checklist id missing
+    # from it is the normal state and says nothing. Silence here is what let 44
+    # rows be filed against the sheet on a build that never held those ids.
+    if triage.get("apk_scan_applicable") is False:
+        warnings.append(
+            "Build này nạp ad unit ID lúc chạy, nên <b>không tra được ID trong APK</b> — "
+            "các dòng ads phải đối chiếu bằng log, và việc ID vắng mặt trong APK "
+            "không nói lên điều gì."
         )
 
     if not warnings:
