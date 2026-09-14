@@ -1,6 +1,6 @@
 """Verify Android package-name checklist rows against the connected device.
 
-Package names (and the AdMob App ID's *own* line under UserMessagingPlatform/
+Package names (and the AdMob App ID's *own* line under
 AdsConsentManager) are handled separately from the FOR_TESTER-family log diff
 because the package name itself is never printed in any trusted log line --
 there's nothing to grep for. Instead we ask the device directly via

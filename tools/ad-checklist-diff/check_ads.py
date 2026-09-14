@@ -225,8 +225,12 @@ def print_summary(result: dict, empty_filters: list[str]) -> None:
 #
 # Why each one is here:
 #   FOR_TESTER, VslTemplate4FirstOpenSDK -- the tester build's own ad dump.
-#   UserMessagingPlatform, AdsConsentManager -- the AdMob App ID's log line,
-#     which the two above never print.
+#   AdsConsentManager -- the AdMob App ID's log line, which the two above never
+#     print. UserMessagingPlatform sat here for the same stated reason and was
+#     removed: measured across three captures it yields no App ID and no other
+#     checklist value, only IAB consent-string keys (IABTCF_TCString,
+#     IABGPP_GppSID), a test-device hashed id and log chatter. Those flowed into
+#     the trusted value pool and out again as leftover_ids for an agent to read.
 #   RemoteConfigRepository -- the "ID ads inapp" placement flags, which have no
 #     tag of their own (just a config dump at app start).
 #   inter_ads -- the interstitial high/normal price-floor decision, the source
@@ -244,7 +248,6 @@ def print_summary(result: dict, empty_filters: list[str]) -> None:
 DEFAULT_FILTERS = [
     "FOR_TESTER",
     "VslTemplate4FirstOpenSDK",
-    "UserMessagingPlatform",
     "AdsConsentManager",
     "RemoteConfigRepository",
     "inter_ads",

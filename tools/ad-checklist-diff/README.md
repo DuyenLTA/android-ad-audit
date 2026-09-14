@@ -19,7 +19,7 @@ https://claude.ai/code/artifact/b499b2e9-314b-4fc3-b01c-f7a13da46c18
   narrowly-scoped fallbacks documented under "Reading the result" below.
 - Cannot verify things that never appear inside a trusted (`--filter`-matched)
   line. CLI and GUI share one filter list (`DEFAULT_FILTERS` in `check_ads.py`:
-  `FOR_TESTER`, `VslTemplate4FirstOpenSDK`, `UserMessagingPlatform`,
+  `FOR_TESTER`, `VslTemplate4FirstOpenSDK`,
   `AdsConsentManager`, `RemoteConfigRepository`, `inter_ads`,
   `loadInterstitialAd`), which covers every area the Nexus app checklist needs.
   Passing `--filter` by hand *replaces* that list, so a run with only
@@ -131,7 +131,6 @@ python check_ads.py \
   --log capture.log \
   --filter FOR_TESTER \
   --filter VslTemplate4FirstOpenSDK \
-  --filter UserMessagingPlatform \
   --filter AdsConsentManager \
   --filter RemoteConfigRepository \
   --filter inter_ads \
