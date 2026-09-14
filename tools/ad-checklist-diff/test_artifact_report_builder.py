@@ -1,3 +1,4 @@
+import artifact_report_builder
 from artifact_report_builder import _label_for, render
 
 
@@ -57,3 +58,38 @@ def test_values_from_the_sheet_are_escaped(tmp_path):
 def test_label_falls_back_to_the_package_when_registry_has_no_entry():
     assert _label_for("com.a", [{"package": "com.b", "label": "B"}]) == "com.a"
     assert _label_for("com.a", [{"package": "com.a", "label": "A"}]) == "A"
+
+
+# --- The page a run replaces is the only record of what was shown ------------
+
+def test_the_previous_page_is_kept_before_it_is_replaced(tmp_path):
+    page = tmp_path / "com.a-artifact.html"
+    page.write_text("<p>lượt trước</p>", encoding="utf-8")
+
+    kept = artifact_report_builder.archive_previous(page)
+    assert kept is not None and kept.parent.name == "history"
+    assert kept.read_text(encoding="utf-8") == "<p>lượt trước</p>"
+    # Copied, not moved: a write that fails after this must still leave the
+    # published page where it was.
+    assert page.exists()
+
+
+def test_a_first_run_has_nothing_to_keep(tmp_path):
+    assert artifact_report_builder.archive_previous(tmp_path / "nope.html") is None
+
+
+def test_two_archived_pages_do_not_collide(tmp_path):
+    import os
+    import time
+
+    page = tmp_path / "com.a-artifact.html"
+    page.write_text("một", encoding="utf-8")
+    first = artifact_report_builder.archive_previous(page)
+
+    page.write_text("hai", encoding="utf-8")
+    os.utime(page, (time.time() + 5, time.time() + 5))
+    second = artifact_report_builder.archive_previous(page)
+
+    assert first != second
+    assert first.read_text(encoding="utf-8") == "một"
+    assert second.read_text(encoding="utf-8") == "hai"

@@ -13,6 +13,8 @@ section chips, row tables, leftover IDs -- is generated here.
 import argparse
 import html
 import json
+import shutil
+from datetime import datetime
 from pathlib import Path
 
 from artifact_run_context import capture_warning, delta_note, mode_label
@@ -150,6 +152,27 @@ def render(
     return page
 
 
+def archive_previous(out: Path) -> Path | None:
+    """Keep the page this run is about to replace, named by when it was built.
+
+    The artifact is republished to one URL on purpose -- the link is shared, and
+    a new link would quietly turn the shared one into an old version. The cost is
+    that the previous page stops existing anywhere the moment the next run wins,
+    so "what did the report say last time" becomes unanswerable beyond the delta.
+    A copy is cents of disk and the only record of what the ads team was actually
+    shown.
+    """
+    if not out.exists():
+        return None
+    stamp = datetime.fromtimestamp(out.stat().st_mtime).strftime("%y%m%d-%H%M%S")
+    kept = out.parent / "history" / f"{out.stem}-{stamp}{out.suffix}"
+    kept.parent.mkdir(parents=True, exist_ok=True)
+    # Copy, not move: a write that fails after this should still leave the
+    # published page on disk where it was.
+    shutil.copy2(out, kept)
+    return kept
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("package")
@@ -184,6 +207,7 @@ def main() -> None:
 
     out = Path(args.out or HERE / "out" / f"{args.package}-artifact.html")
     out.parent.mkdir(parents=True, exist_ok=True)
+    archive_previous(out)
     out.write_text(
         render(
             snapshot,
