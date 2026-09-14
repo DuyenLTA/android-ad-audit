@@ -467,3 +467,48 @@ def test_home_wait_falls_back_to_the_fixed_dwell_without_a_capture_file():
     )
     assert slept == [device_driver.HOME_DWELL_CAP]
     assert waited == device_driver.HOME_DWELL_CAP
+
+
+class _FocusSequence(_TapRecorder):
+    """A device whose focus reads differently on each poll.
+
+    `None` in the sequence means `dumpsys` printed no mCurrentFocus line at all,
+    which is what a splash window mid-draw looks like.
+    """
+
+    def __init__(self, focuses):
+        super().__init__()
+        self._focuses = list(focuses)
+
+    def run(self, args, **kwargs):
+        if args[:3] == ["shell", "dumpsys", "window"]:
+            self.cmds.append(" ".join(args))
+            value = self._focuses.pop(0) if self._focuses else "com.x/com.x.SplashActivity"
+            return "" if value is None else "mCurrentFocus=Window{1 u0 " + value + "}\n"
+        return super().run(args, **kwargs)
+
+
+def test_spam_keeps_sweeping_while_focus_is_unreadable():
+    # Regression: mCurrentFocus reads `null` while the splash window is still
+    # being drawn, which is exactly when these bursts run. Reading that as "we
+    # left the app" cut the sweep to its first spot; that spot missed the logo,
+    # tester logging never came on, and the capture carried zero FOR_TESTER
+    # lines -- the only runtime evidence the ad rows have. Driving the same four
+    # spots by hand, ignoring the null, produced 27 of them.
+    device = _FocusSequence([None] * len(SPLASH_SPOT_FRACTIONS))
+    tapped = splash_logo_spam(None, package="com.x", run=device.run, sleep=lambda s: None)
+    assert len(tapped) == len(SPLASH_SPOT_FRACTIONS)
+
+
+def test_an_unreadable_focus_does_not_disarm_the_ad_guard():
+    # The null must not become a way to tap through an interstitial: once an ad
+    # is readable on screen, the sweep still stops there.
+    device = _FocusSequence([None, "com.x/com.google.android.gms.ads.AdActivity"])
+    tapped = splash_logo_spam(None, package="com.x", run=device.run, sleep=lambda s: None)
+    assert len(tapped) == 2
+
+
+def test_an_unreadable_focus_does_not_disarm_the_foreign_app_guard():
+    device = _FocusSequence([None, "com.google.android.youtube/com.google.Main"])
+    tapped = splash_logo_spam(None, package="com.x", run=device.run, sleep=lambda s: None)
+    assert len(tapped) == 2

@@ -85,7 +85,16 @@ def splash_logo_spam(
 
     Tapping blind past the splash is how a run once ended up inside YouTube: an
     interstitial had appeared and the remaining taps landed on the ad. So the
-    bursts stop as soon as focus leaves the app or an ad activity takes over.
+    bursts stop as soon as focus is seen to be another app or an ad activity.
+
+    Seen to be -- an unreadable focus is not one of those. `mCurrentFocus` reads
+    `null` while the splash window is still being drawn, which is exactly when
+    these bursts run, and treating that as "we left the app" stopped the sweep
+    after its first spot. One spot is a guess again, the thing the sweep exists
+    to stop being: that spot missed the logo, tester logging never came on, and
+    the capture carried zero FOR_TESTER lines -- the whole runtime evidence for
+    the ad rows. Driving the same four spots by hand, ignoring the null, turned
+    it on and produced 27 of them.
     """
     sleep(SPLASH_APPEAR_SECONDS)
     spots = splash_spots(tap_xy, run=run)
@@ -95,7 +104,8 @@ def splash_logo_spam(
         tapped.append(spot)
         found = focused_package_activity(run=run)
         if not found:
-            break
+            # Transitional, not a departure: keep sweeping the band.
+            continue
         pkg, activity = found
         if (package and pkg != package) or "AdActivity" in activity:
             break
