@@ -102,13 +102,27 @@ const FINDINGS_SCHEMA = {
   required: ['findings'],
 }
 
-const VERDICT_SCHEMA = {
+const VERDICTS_SCHEMA = {
   type: 'object',
   properties: {
-    holds: { type: 'boolean' },
-    why: { type: 'string' },
+    verdicts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          // Chép đúng chuỗi `value` của dòng đang phản biện, để map ngược lại.
+          value: { type: 'string' },
+          holds: { type: 'boolean' },
+          why: { type: 'string' },
+        },
+        required: ['value', 'holds', 'why'],
+      },
+    },
+    // Chỗ gãy nằm ở chính tool, nếu có. Một agent nhìn được cả rổ findings mới
+    // thấy được thứ này -- xem chú thích ở `verify`.
+    tool_gap: { type: 'string' },
   },
-  required: ['holds', 'why'],
+  required: ['verdicts'],
 }
 
 // Judge and verify ask the same questions of the same files, so they get the
@@ -181,26 +195,50 @@ Thiếu bối cảnh thì trả khong-ket-luan-duoc, đừng đoán bù.`,
   { label: `judge:${pkg}`, phase: 'Judge', schema: FINDINGS_SCHEMA },
 )
 
-const verify = (pkg, f) => agent(
-  `Phản biện kết luận sau về app ${pkg}, dòng checklist "${f.value}".
-Kết luận: ${f.verdict}. Bằng chứng đưa ra: ${f.evidence}
+// Một agent phản biện cả rổ findings của app, không phải mỗi dòng một agent.
+//
+// Mỗi dòng một agent nghe thì kỹ hơn, thực tế thì không: một lượt 17 agent mất
+// 18 phút và cả 17 agent đều tự đi tra lại cùng một mảng build_ad_ids trong
+// cùng một file triage, rồi lần lượt phát hiện lại cùng một điều. Phép kiểm nằm
+// ở cùng vài file cho mọi dòng, nên chạy lại nó 17 lần không mua thêm gì.
+//
+// Gom lại còn mua thêm được thứ mà tách ra không thấy: dòng này lệch là chuyện
+// của dòng này, nhưng CẢ RỔ cùng lệch theo một kiểu thì lỗi nằm ở phép kiểm chứ
+// không ở app. Agent chỉ cầm một dòng không có cách nào thấy được điều đó --
+// nên `tool_gap` hỏi thẳng, thay vì trông vào việc một agent lẻ tự ngộ ra.
+const verify = (pkg, findings) => agent(
+  `Phản biện các kết luận sau về app ${pkg}. Với MỖI dòng, trả một verdict.
+
+${findings.map((f, i) => `--- Dòng ${i + 1} ---
+value: "${f.value}"
+Kết luận: ${f.verdict}
+Bằng chứng đưa ra: ${f.evidence}`).join('\n\n')}
 
 Tự kiểm lại từ APK/log, ĐỪNG tin lời bằng chứng trên. Trả holds=false nếu bằng
 chứng không đứng vững hoặc có cách giải thích khác hợp lý hơn. Đừng xác nhận chỉ
-vì nghe hợp lý.
+vì nghe hợp lý. Trong mỗi verdict, chép đúng chuỗi \`value\` của dòng đó.
 
 Kiểm lại độc lập nghĩa là tự chạy lại phép kiểm, KHÔNG phải tự đi tìm lại chỗ để
 chạy. Mọi đường dẫn và công cụ cần dùng nằm ngay dưới đây -- đừng \`ls\`, đừng
-\`find\`, đừng đọc source của tool để đoán nó làm gì.
+\`find\`, đừng đọc source của tool để đoán nó làm gì. Các dòng dùng chung vài
+file này, nên đọc một lần rồi phán cho cả rổ, đừng mở lại cho từng dòng.
 
 ${sources(pkg)}
 
 ${captureContext}
 
 Nếu nhãn của kết luận sai nhưng dữ kiện đúng, holds=false và nói rõ nhãn nào mới
-đúng. Nếu chỗ gãy nằm ở chính tool (một phép kiểm đáng lẽ phải chạy mà không
-chạy), nói thẳng ra -- đó là phát hiện có giá trị hơn việc phán lại dòng đó.`,
-  { label: `verify:${pkg}:${f.value}`, phase: 'Verify', schema: VERDICT_SCHEMA },
+đúng.
+
+CUỐI CÙNG, nhìn cả rổ cùng lúc và trả lời riêng ở trường \`tool_gap\`: các dòng
+này có cùng lệch theo MỘT kiểu không, và kiểu đó có phải do một phép kiểm của
+tool đáng lẽ phải chạy mà không chạy (hoặc chạy trong điều kiện nó không còn
+đúng) không? Ví dụ đã gặp thật: app nạp ad unit ID qua remote config nên KHÔNG
+ID production nào nằm trong APK, khiến phép kiểm "có trong APK không" vô hiệu và
+đổ hàng loạt dòng sang "không có trong build". Có thì nói thẳng đó là gì và dựa
+vào đâu; không có thì để rỗng. Đây là phát hiện có giá trị hơn việc phán lại
+từng dòng.`,
+  { label: `verify:${pkg}`, phase: 'Verify', schema: VERDICTS_SCHEMA },
 )
 
 // Đọc được thì dùng để bỏ bớt agent ở dưới; không đọc được thì để rỗng, và mọi
@@ -267,20 +305,32 @@ if (toJudge.length === 0) {
 // ngoài thay vì tốn một agent chỉ để nghe lại đúng câu đó.
 const arguable = (f) => f.verdict !== 'khong-ket-luan-duoc'
 
+// Ghép verdict về đúng dòng của nó. Dòng nào agent không trả verdict thì để
+// `null` -- nó rơi vào `unresolved` và có người xem, chứ không được coi là đã
+// qua phản biện.
+const attach = (pkg, findings, result) => {
+  const byValue = new Map((result?.verdicts ?? []).map((v) => [v.value, v]))
+  return findings.map((f) => ({
+    pkg,
+    ...f,
+    verify: arguable(f) ? byValue.get(f.value) ?? null : null,
+    tool_gap: result?.tool_gap || undefined,
+  }))
+}
+
 const results = await pipeline(
   toJudge,
   (pkg) => judge(pkg).then((r) => ({ pkg, findings: r.findings ?? [] })),
-  ({ pkg, findings }) =>
-    parallel(
-      findings.map((f) => () =>
-        arguable(f)
-          ? verify(pkg, f).then((v) => ({ pkg, ...f, verify: v }))
-          : Promise.resolve({ pkg, ...f, verify: null }),
-      ),
-    ),
+  async ({ pkg, findings }) => {
+    const arguables = findings.filter(arguable)
+    if (arguables.length === 0) return attach(pkg, findings, null)
+    return attach(pkg, findings, await verify(pkg, arguables))
+  },
 )
 
 const all = results.flat().filter(Boolean)
+// Chỗ gãy của tool không thuộc về dòng nào cả, nên nó đi ra ngoài riêng.
+const toolGaps = [...new Set(all.map((f) => f.tool_gap).filter(Boolean))]
 return {
   confirmed: all.filter((f) => f.verify?.holds),
   disputed: all.filter((f) => f.verify && !f.verify.holds),
@@ -288,4 +338,5 @@ return {
   // nhưng khác hẳn disputed -- disputed là có luận điểm và luận điểm đó đổ.
   unresolved: all.filter((f) => !f.verify),
   clean: idle,
+  tool_gaps: toolGaps,
 }
