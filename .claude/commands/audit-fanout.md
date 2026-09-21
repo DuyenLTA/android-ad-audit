@@ -151,14 +151,14 @@ Với mỗi app vừa chạy:
 
    ```
    cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
-     --package <package> <url vừa publish>
+     --package <package> --no-open <url vừa publish>
    ```
 
-   Ghi link là **tự mở trình duyệt**, không cần cờ gì thêm: lượt chạy nào xong
-   cũng phải bật trang lên cho người dùng xem, nên đó là mặc định chứ không phải
-   thứ để nhớ bật. Máy không có màn hình thì nó báo ra stderr và vẫn lưu link —
-   không coi đó là lỗi của lượt chạy. (`--no-open` chỉ dùng khi người dùng bảo
-   đừng mở.)
+   **`--no-open` là bắt buộc, đừng bỏ.** Artifact tool lúc publish đã tự bật
+   trang lên rồi (mở URL kèm `?via=auto_p`), nên để `artifact_link.py` mở thêm
+   lần nữa là người dùng lĩnh đúng hai cửa sổ cùng một trang — hai lớp tự mở,
+   không lớp nào biết lớp kia đã mở. Ghi link vẫn chạy bình thường với cờ này;
+   `--no-open` chỉ tắt phần bật browser, không tắt phần lưu.
 
    Vẫn in URL ra trong lời báo: browser có thể không mở được, và người ta còn
    cần link để gửi cho ads-team.
