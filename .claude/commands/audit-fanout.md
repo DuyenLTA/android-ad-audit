@@ -151,14 +151,13 @@ Với mỗi app vừa chạy:
 
    ```
    cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
-     --package <package> --no-open <url vừa publish>
+     --package <package> <url vừa publish>
    ```
 
-   **`--no-open` là bắt buộc, đừng bỏ.** Artifact tool lúc publish đã tự bật
-   trang lên rồi (mở URL kèm `?via=auto_p`), nên để `artifact_link.py` mở thêm
-   lần nữa là người dùng lĩnh đúng hai cửa sổ cùng một trang — hai lớp tự mở,
-   không lớp nào biết lớp kia đã mở. Ghi link vẫn chạy bình thường với cờ này;
-   `--no-open` chỉ tắt phần bật browser, không tắt phần lưu.
+   **Đừng thêm `--no-open`.** Lệnh này vừa ghi link vừa bật browser, và nó là
+   lớp mở trang duy nhất chạy được ở đây. Artifact tool publish xong (nhất là
+   publish đè lên `url` có sẵn) không bật browser trên máy này, `action: "open"`
+   cũng không. Bỏ phần mở ở đây thì chạy xong người dùng chẳng thấy gì.
 
    Vẫn in URL ra trong lời báo: browser có thể không mở được, và người ta còn
    cần link để gửi cho ads-team.
