@@ -43,6 +43,9 @@ const toolDir = args?.toolDir ?? 'tools/ad-checklist-diff'
 // anywhere but the repo root has to be told where the repo is. Default '.'
 // keeps a session opened at the root behaving exactly as before.
 const repoDir = args?.repoDir ?? '.'
+// The venv's interpreter lives in .venv/Scripts on Windows and .venv/bin elsewhere,
+// so the caller passes the path it resolved instead of the script guessing the OS.
+const python = args?.python ?? '.venv/bin/python'
 const apps = args?.apps ?? []
 const auditMode = args?.audit ?? 'capture'
 const force = args?.force === true
@@ -150,7 +153,7 @@ const sources = (pkg) => `Nguồn, dùng đúng các file này, KHÔNG đoán v�
 - Chuỗi khác (token, tên placement, tên cờ), chạy đúng một lệnh, đừng tự viết
   zipfile, đừng đọc source của tool để hiểu nó làm gì:
 
-    cd ${repoDir} && .venv/bin/python ${toolDir}/apk_strings.py --package ${pkg} <chuỗi> <chuỗi>
+    cd ${repoDir} && ${python} ${toolDir}/apk_strings.py --package ${pkg} <chuỗi> <chuỗi>
 
   \`--package\` là CỜ, không phải positional: mọi tham số không có cờ đều bị coi
   là chuỗi cần tìm. Nó quét cả UTF-8 lẫn UTF-16LE trong mọi entry, xong trong
@@ -272,7 +275,7 @@ if (auditMode !== 'skip') {
   const audit = await agent(
     `Chạy đúng một lệnh này, không thêm bớt cờ nào, không đổi thư mục nào khác:
 
-    cd ${repoDir} && .venv/bin/python ${toolDir}/audit_runner.py${flags}
+    cd ${repoDir} && ${python} ${toolDir}/audit_runner.py${flags}
 
 Nó có thể lái máy thật và mất vài phút -- chờ cho xong, đừng bỏ ngang, đừng
 chạy lại. Báo "build và checklist đều chưa đổi" là ĐÚNG, không phải lỗi: triage

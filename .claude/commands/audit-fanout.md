@@ -16,6 +16,9 @@ theo thứ tự, lấy cái đầu tiên có `tools/ad-checklist-diff/audit_runn
 
 Không thấy thì dừng, nói rõ đã tìm ở đâu. Gọi đường dẫn tìm được là `<repo>`.
 
+Gọi `<venv>` = `<repo>/.venv/Scripts` trên Windows, `<repo>/.venv/bin` trên
+macOS/Linux. Mọi lệnh Python dưới đây gọi qua `<venv>/python`.
+
 Từ đây trở đi mọi lệnh bash đều mở đầu bằng `cd <repo> && …`, và mọi đường dẫn
 truyền cho agent đều là **tuyệt đối**. Agent không thừa hưởng CWD của phiên
 gọi — đường dẫn tương đối là cách chắc chắn nhất để nó đọc nhầm file.
@@ -34,7 +37,7 @@ registry thay thế** — mỗi lượt là một app, do người dùng chỉ �
 Có package thì phân giải nó — vẫn **đừng tự so chuỗi**:
 
 ```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --exact "<package>"
+cd <repo> && <venv>/python tools/ad-checklist-diff/find_app.py --exact "<package>"
 ```
 
 Package **không cần có sẵn trong `apps.json`**. Registry chỉ là cache: mỗi tab
@@ -56,7 +59,7 @@ Theo exit code:
 Muốn app khỏi phải tra sheet mỗi lượt thì ghi nó vào registry một lần:
 
 ```
-cd <repo> && .venv/bin/python tools/ad-checklist-diff/find_app.py --device --add "<tên trên icon>"
+cd <repo> && <venv>/python tools/ad-checklist-diff/find_app.py --device --add "<tên trên icon>"
 ```
 
 Đây là tiện ích, không phải điều kiện để chạy.
@@ -81,6 +84,7 @@ Rồi gọi Workflow tool với `scriptPath: "<scratchpad>/audit-fanout.mjs"` v�
 - `apps`: danh sách package lấy ở bước 1. Bắt buộc, không bao giờ để rỗng.
 - `repoDir`: `<repo>`
 - `toolDir`: `<repo>/tools/ad-checklist-diff`
+- `python`: `<venv>/python` (đường dẫn tuyệt đối)
 - `audit`: `"capture"` mặc định · `"apk"` nếu có cờ `--apk` · `"skip"` nếu có cờ `--skip`
 - `force`: `true` nếu có cờ `--force`
 
@@ -120,7 +124,7 @@ Với mỗi app vừa chạy:
 2. Dựng trang:
 
    ```
-   cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
+   cd <repo> && <venv>/python tools/ad-checklist-diff/artifact_report_builder.py <package> \
      --findings tools/ad-checklist-diff/out/<package>-findings.html \
      --notes    tools/ad-checklist-diff/out/<package>-notes.html \
      --highlight <đuôi ID mà phần điều tra có giải thích> \
@@ -138,7 +142,7 @@ Với mỗi app vừa chạy:
 3. Trước khi publish, hỏi xem app này đã có trang chưa:
 
    ```
-   cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
+   cd <repo> && <venv>/python tools/ad-checklist-diff/artifact_link.py \
      --package <package> --show
    ```
 
@@ -150,7 +154,7 @@ Với mỗi app vừa chạy:
    Artifact tool, rồi ghi lại link — **bước này bắt buộc, không phải tuỳ chọn**:
 
    ```
-   cd <repo> && .venv/bin/python tools/ad-checklist-diff/artifact_link.py \
+   cd <repo> && <venv>/python tools/ad-checklist-diff/artifact_link.py \
      --package <package> <url vừa publish>
    ```
 
