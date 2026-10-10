@@ -1,7 +1,7 @@
 <title>Đối chiếu ads {{TITLE}}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
 <style>
   :root {
     --paper:#f1f5f9; --surface:#ffffff; --sunk:#e8eef4;
@@ -13,7 +13,7 @@
     --warn:#c2740a; --warn-bg:#fcf1dd;
     --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
     --sans:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
-    --serif:"IBM Plex Serif",Georgia,serif;
+    --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -36,7 +36,7 @@
     --warn:#fbbf24; --warn-bg:#2e2411;
   }
 
-  body { background:var(--paper); color:var(--ink); font-family:var(--serif); font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased; }
   .wrap { max-width:900px; margin-inline:auto; padding-inline:22px; padding-block:40px 84px; display:flex; flex-direction:column; gap:44px; }
   h1,h2,h3,h4 { font-family:var(--sans); font-weight:600; text-wrap:balance; margin:0; line-height:1.2; }
   p { margin:0; }
@@ -116,7 +116,7 @@
   .sec td { padding:9px 16px; border-bottom:1px solid var(--rule-soft); vertical-align:top; }
   .sec tbody tr:last-child td { border-bottom:none; }
   .c-label { font-family:var(--sans); font-weight:600; max-width:24ch; }
-  .twin { font-family:var(--serif); font-weight:400; font-style:italic; color:var(--ink-faint); font-size:13px; }
+  .twin { font-family:var(--body); font-weight:400; font-style:italic; color:var(--ink-faint); font-size:13px; }
   .c-val .val { font-family:var(--mono); font-size:12.5px; overflow-wrap:anywhere; display:block; }
   .altid { font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); display:block; margin-top:2px; overflow-wrap:anywhere; }
   .c-st { white-space:nowrap; }
@@ -125,7 +125,7 @@
   .st--miss { color:var(--miss); background:var(--miss-bg); }
   .tr--miss td { background:var(--miss-bg); }
   .tr--miss .c-label { box-shadow:inset 3px 0 0 var(--miss); }
-  .rownote { font-family:var(--serif); font-size:13px; color:var(--ink-soft); white-space:normal; max-width:44ch; margin-top:6px; }
+  .rownote { font-family:var(--body); font-size:13px; color:var(--ink-soft); white-space:normal; max-width:44ch; margin-top:6px; }
 
   /* verdict strip */
   .verdict { display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 16px; border-left:4px solid var(--miss); background:var(--miss-bg); padding:14px 18px; }
@@ -168,7 +168,7 @@
   .log .ln { color:var(--ink-faint); text-align:right; font-variant-numeric:tabular-nums; user-select:none; border-right:1px solid var(--rule-soft); }
   .log em { font-style:normal; color:var(--hit); font-weight:600; }
   .log s { color:var(--miss); }
-  .log .why { display:block; white-space:normal; font-family:var(--serif); font-size:13.5px; color:var(--ink-soft); margin-top:5px; max-width:58ch; }
+  .log .why { display:block; white-space:normal; font-family:var(--body); font-size:13.5px; color:var(--ink-soft); margin-top:5px; max-width:58ch; }
 
   /* ruled list */
   .ruled { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; }
@@ -195,6 +195,34 @@
   .colophon { border-top:1px solid var(--rule); padding-top:16px; font-family:var(--mono); font-size:11.5px; color:var(--ink-faint); display:flex; flex-direction:column; gap:4px; overflow-wrap:anywhere; }
 
   @media (max-width:600px) { .duel { grid-template-columns:1fr; } }
+
+  /* rounded card surfaces: sections read as separate cards, coloured by whether they still hold a mismatch */
+  .accent-rule, .meter { border-radius:999px; }
+  .statchip, .callout, .dex, .log, .probe table, .verdict, .verdict-confirmed { border-radius:10px; }
+  .duel { border-radius:10px; overflow:hidden; }
+  .notes li { border:1px solid var(--rule); border-left:4px solid var(--accent); border-radius:8px; }
+  .st { border:none; border-radius:999px; padding:2px 10px; }
+  .secs { display:flex; flex-direction:column; gap:8px; }
+  .sec { border-radius:10px; overflow:hidden; border-left:4px solid var(--hit); }
+  .sec + .sec { border-top:1px solid var(--rule); }
+  .sec:has(.tr--miss) { border-left-color:var(--miss); }
+  .sec > summary:hover { background:var(--sunk); }
+
+  /* filter cards: click to show only matched / only mismatched rows */
+  .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+  @media (max-width:640px) { .cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .card { background:var(--surface); border:1px solid var(--rule); border-radius:10px; padding:12px 14px; text-align:left; cursor:pointer; color:var(--ink); font:inherit; display:grid; gap:2px; }
+  .card .n { font:600 26px/1.1 var(--sans); font-variant-numeric:tabular-nums; }
+  .card .l { font-size:12px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em; }
+  .card.ok .n { color:var(--hit); }
+  .card.bad .n { color:var(--miss); }
+  .card.warn .n { color:var(--warn); }
+  .card[aria-pressed="true"] { outline:2px solid var(--accent); outline-offset:-1px; }
+  .card:focus-visible { outline:2px solid var(--accent); }
+  .toolbar { display:flex; flex-wrap:wrap; gap:8px; }
+  .btn { font:500 13px var(--body); padding:6px 14px; border-radius:999px; border:1px solid var(--rule); background:var(--surface); color:var(--ink-soft); cursor:pointer; }
+  .btn:hover, .btn:focus-visible { border-color:var(--accent); color:var(--accent-ink); }
+  .is-hidden { display:none !important; }
 </style>
 
 <div class="wrap">
@@ -221,16 +249,18 @@
     <div class="meter" role="img" aria-label="{{MATCHED}} trên {{TOTAL}} dòng khớp, {{MISSED}} dòng lệch">
       <span class="meter-hit" style="width:{{MATCH_PCT}}%"></span>
     </div>
-    <div class="meter-key">
-      <span><i class="swatch sw--hit"></i>{{MATCHED}} khớp</span>
-      <span><i class="swatch sw--miss"></i>{{MISSED}} lệch</span>
+    <div class="cards" role="group" aria-label="Lọc bảng đối chiếu">
+      <button class="card" data-f="all" aria-pressed="true"><span class="n">{{TOTAL}}</span><span class="l">Tất cả</span></button>
+      <button class="card ok" data-f="pass" aria-pressed="false"><span class="n">{{MATCHED}}</span><span class="l">Khớp</span></button>
+      <button class="card bad" data-f="fail" aria-pressed="false"><span class="n">{{MISSED}}</span><span class="l">Lệch</span></button>
+      <button class="card warn" data-f="leftover" aria-pressed="false"><span class="n">{{LEFTOVER_N}}</span><span class="l">ID ngoài sheet</span></button>
     </div>
     <div class="statchips">{{CHIPS}}</div>
   </div>
 
   <div class="probe">{{FINDINGS}}</div>
 
-  <section>
+  <section id="leftover">
     <h2>ID có trong build, không có trong sheet</h2>
     <ul class="notes">{{LEFTOVER}}</ul>
   </section>
@@ -238,7 +268,11 @@
   <section>
     <h2>Bảng đối chiếu đầy đủ</h2>
     <p class="ref-note">Dữ liệu tra cứu. Mục nào còn dòng lệch thì mở sẵn; mục khớp hết thì gấp lại, bấm để xem.</p>
-    <div>{{TABLES}}</div>
+    <div class="toolbar">
+      <button class="btn" data-expand="1">Mở tất cả</button>
+      <button class="btn" data-expand="0">Gập tất cả</button>
+    </div>
+    <div class="secs" id="secs">{{TABLES}}</div>
   </section>
 
   <div class="closing">{{NOTES}}</div>
@@ -249,3 +283,32 @@
   </footer>
 
 </div>
+
+<script>
+(function () {
+  var cards = document.querySelectorAll('.card'), secs = document.querySelectorAll('.sec');
+  var defaultOpen = Array.prototype.map.call(secs, function (d) { return d.open; });
+  function apply(f) {
+    if (f === 'leftover') { document.getElementById('leftover').scrollIntoView({ behavior: 'smooth' }); return; }
+    secs.forEach(function (d, i) {
+      var shown = 0;
+      d.querySelectorAll('tbody tr').forEach(function (r) {
+        var miss = r.classList.contains('tr--miss');
+        var keep = f === 'all' || (f === 'fail' && miss) || (f === 'pass' && !miss);
+        r.classList.toggle('is-hidden', !keep);
+        if (keep) shown++;
+      });
+      d.classList.toggle('is-hidden', shown === 0);
+      d.open = f === 'all' ? defaultOpen[i] : shown > 0;
+    });
+    cards.forEach(function (c) { c.setAttribute('aria-pressed', c.dataset.f === f ? 'true' : 'false'); });
+    if (f !== 'all') document.getElementById('secs').scrollIntoView({ behavior: 'smooth' });
+  }
+  cards.forEach(function (c) { c.addEventListener('click', function () { apply(c.dataset.f); }); });
+  document.querySelectorAll('[data-expand]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      secs.forEach(function (d) { if (!d.classList.contains('is-hidden')) d.open = b.dataset.expand === '1'; });
+    });
+  });
+})();
+</script>
