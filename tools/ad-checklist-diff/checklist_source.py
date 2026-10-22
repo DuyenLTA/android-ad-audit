@@ -1,13 +1,39 @@
 """Fetch and parse the Google Sheet checklist into (section, label, value) rows."""
+import contextlib
 import csv
 import hashlib
 import io
 import json
 import re
+import socket
 
 import requests
+import urllib3.util.connection as urllib3_connection
 
 ID_RE = re.compile(r"ca-app-pub-\d+[/~]\d+")
+
+
+@contextlib.contextmanager
+def _ipv4_only():
+    """Resolve hosts to IPv4 addresses only, for the duration of the block.
+
+    The sheet export redirects to *.googleusercontent.com, which also publishes
+    IPv6 addresses. On networks where IPv6 is advertised but broken, urllib3
+    tries those first and has no fallback race like curl's: the request hangs
+    until timeout or comes back as a Google 400 page, while IPv4 answers in ~2s.
+    """
+    original = urllib3_connection.allowed_gai_family
+    urllib3_connection.allowed_gai_family = lambda: socket.AF_INET
+    try:
+        yield
+    finally:
+        urllib3_connection.allowed_gai_family = original
+
+
+def sheet_get(url: str, timeout: float = 30) -> requests.Response:
+    """GET a Google Sheet URL over IPv4 (see `_ipv4_only` for why)."""
+    with _ipv4_only():
+        return requests.get(url, allow_redirects=True, timeout=timeout)
 
 
 def sheet_csv_url(sheet_url: str) -> str:
@@ -60,10 +86,13 @@ def parse_checklist_csv(csv_text: str) -> list[dict]:
 def fetch_checklist(sheet_url: str) -> list[dict]:
     """Download and parse the checklist sheet into (section, label, value) rows."""
     url = sheet_csv_url(sheet_url)
-    resp = requests.get(url, allow_redirects=True, timeout=30)
+    try:
+        resp = sheet_get(url)
+    except requests.RequestException as exc:
+        raise SystemExit(f"Could not reach the sheet ({type(exc).__name__}): {url}")
     if resp.status_code != 200 or "text/html" in resp.headers.get("content-type", ""):
         raise SystemExit(
-            "Could not download the sheet as CSV (got HTML/error instead). "
+            f"Could not download the sheet as CSV (HTTP {resp.status_code}, got HTML/error instead). "
             "Check the sheet is shared as 'Anyone with the link can view'."
         )
     return parse_checklist_csv(resp.text)

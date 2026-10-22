@@ -15,10 +15,8 @@ import json
 import os
 import re
 
-import requests
-
 from apk_source import CACHE_DIR
-from checklist_source import sheet_csv_url
+from checklist_source import sheet_csv_url, sheet_get
 from package_verifier import is_package_name
 
 TAB_CACHE = os.path.join(CACHE_DIR, "sheet-tabs.json")
@@ -33,7 +31,7 @@ def sheet_id(sheet_url: str) -> str:
     return found.group(1)
 
 
-def tab_gids(sheet_url: str, get=requests.get) -> list[str]:
+def tab_gids(sheet_url: str, get=sheet_get) -> list[str]:
     """Every tab's gid, in the order the sheet lists them."""
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id(sheet_url)}/htmlview"
     resp = get(url, timeout=30)
@@ -45,7 +43,7 @@ def tab_gids(sheet_url: str, get=requests.get) -> list[str]:
     return gids
 
 
-def tab_package(sheet_url: str, gid: str, get=requests.get) -> str | None:
+def tab_package(sheet_url: str, gid: str, get=sheet_get) -> str | None:
     """The package a tab declares, from its own `Package name` row."""
     url = sheet_csv_url(f"{sheet_url.split('#')[0].split('?')[0]}?gid={gid}")
     resp = get(url, timeout=30)
