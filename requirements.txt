@@ -1,0 +1,4 @@
+# Runtime: the only third-party import in tools/ad-checklist-diff
+requests>=2.31
+# Tests
+pytest>=8.0
