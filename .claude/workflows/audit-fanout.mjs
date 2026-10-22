@@ -45,8 +45,17 @@ const toolDir = args?.toolDir ?? 'tools/ad-checklist-diff'
 const repoDir = args?.repoDir ?? '.'
 // The venv's interpreter lives in .venv/Scripts on Windows and .venv/bin elsewhere,
 // so the caller passes the path it resolved instead of the script guessing the OS.
-const python = args?.python ?? '.venv/bin/python'
+// No default: a guessed '.venv/bin/python' is wrong on Windows, and the audit
+// agent would then fail on the first command instead of here with a clear reason.
+const python = args?.python
 const apps = args?.apps ?? []
+
+if (!python) {
+  throw new Error(
+    'Chưa có args.python: truyền đường dẫn tuyệt đối tới python trong venv, ' +
+    '<repo>/.venv/Scripts/python trên Windows, <repo>/.venv/bin/python trên macOS/Linux.',
+  )
+}
 const auditMode = args?.audit ?? 'capture'
 const force = args?.force === true
 
