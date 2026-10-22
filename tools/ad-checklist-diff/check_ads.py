@@ -158,6 +158,14 @@ def _mismatch_note(
     return f"ID checklist: {value} (lệch) -- không thấy ID lệch nào tương ứng trong log"
 
 
+def checklist_values(checklist: list[dict]) -> set[str]:
+    """Every value a checklist row answers for: its value, alt_values and known aliases."""
+    values = {row["value"] for row in checklist}
+    values.update(alt for row in checklist for alt in row.get("alt_values", []))
+    values.update(alt for alts in KNOWN_ALIASES.values() for alt in alts)
+    return values
+
+
 def diff(
     checklist: list[dict],
     trusted_values: set[str],
@@ -181,10 +189,8 @@ def diff(
     key_value_pairs = key_value_pairs or {}
     key_cooccurrences = key_cooccurrences or {}
 
-    checklist_values = {row["value"] for row in checklist}
-    checklist_values.update(alt for row in checklist for alt in row.get("alt_values", []))
-    checklist_values.update(alt for alts in KNOWN_ALIASES.values() for alt in alts)
-    extra = sorted(v for v in trusted_values if v not in checklist_values)
+    claimed = checklist_values(checklist)
+    extra = sorted(v for v in trusted_values if v not in claimed)
     leftover_ids = [v for v in extra if ID_RE.fullmatch(v)]
 
     # First pass: found status, grouped by section (a row's note may depend
@@ -199,7 +205,7 @@ def diff(
     # Second pass: notes for mismatched rows, now that each section's full
     # sibling set is known.
     for section_rows in sections.values():
-        candidates = _cooccurrence_candidates(section_rows, key_cooccurrences, checklist_values)
+        candidates = _cooccurrence_candidates(section_rows, key_cooccurrences, claimed)
         for row in section_rows:
             if not row["found"]:
                 row["note"] = _mismatch_note(

@@ -48,6 +48,26 @@ def test_leftover_id_explained_by_the_findings_points_back_at_them(tmp_path):
     assert out.count("có trong phần điều tra") == 1
 
 
+def test_leftover_counts_unlisted_ids_from_the_apk_not_only_the_log():
+    # A log that missed the ad screens must not make the APK's unlisted IDs vanish.
+    rows = [_row("ca-app-pub-1/100", True), _row("inter_x", True, alt_values=["ca-app-pub-1/200"])]
+    snap = _snapshot(rows, leftover=["ca-app-pub-1/300"])
+    triage = {"version_code": 7, "build_ad_ids": [
+        "ca-app-pub-1/100", "ca-app-pub-1/200",            # claimed by a row / its alt value
+        "ca-app-pub-1/300", "ca-app-pub-1/400",            # unlisted: from the log, from the APK
+        "ca-app-pub-3940256099942544/6300978111",          # SDK sample ad
+        "ca-app-pub-0000000000000000~0000000000",          # placeholder
+    ]}
+    assert artifact_report_builder.leftover_ids(snap, triage) == ["ca-app-pub-1/300", "ca-app-pub-1/400"]
+
+
+def test_leftover_ignores_the_apk_scan_of_a_different_build():
+    snap = _snapshot([_row("a", True)], leftover=["ca-app-pub-1/300"])
+    triage = {"version_code": 8, "build_ad_ids": ["ca-app-pub-1/400"]}
+    assert artifact_report_builder.leftover_ids(snap, triage) == ["ca-app-pub-1/300"]
+    assert artifact_report_builder.leftover_ids(snap, None) == ["ca-app-pub-1/300"]
+
+
 def test_values_from_the_sheet_are_escaped(tmp_path):
     tpl = tmp_path / "t.html"
     tpl.write_text("{{TABLES}}", encoding="utf-8")

@@ -17,7 +17,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from apk_verifier import is_sample_ad_id
 from artifact_run_context import capture_warning, delta_note, mode_label
+from check_ads import ID_RE, checklist_values
 from console_encoding import use_utf8_console
 
 HERE = Path(__file__).parent
@@ -87,6 +89,27 @@ def _chip_html(index: int, name: str, rows: list[dict]) -> str:
     )
 
 
+def leftover_ids(snapshot: dict, triage: dict | None) -> list[str]:
+    """Ad IDs the build carries that no checklist row claims.
+
+    The snapshot's own `leftover_ids` only holds IDs seen in the capture log, so a
+    run whose log missed the ad screens reported none even when the APK held a
+    dozen unlisted production IDs. The APK scan (`build_ad_ids` in the triage) is
+    folded in too -- minus SDK sample/placeholder IDs, and only when the triage is
+    for the same build as the snapshot.
+    """
+    ids = set(snapshot["result"].get("leftover_ids", []))
+    same_build = triage and str(triage.get("version_code")) == str(snapshot.get("version_code"))
+    if same_build and triage.get("build_ad_ids"):
+        rows = [r for rs in snapshot["result"]["sections"].values() for r in rs]
+        claimed = checklist_values(rows)
+        ids.update(
+            v for v in triage["build_ad_ids"]
+            if ID_RE.fullmatch(v) and not is_sample_ad_id(v) and v not in claimed
+        )
+    return sorted(ids)
+
+
 def _leftover_html(ids: list[str], highlight: tuple[str, ...]) -> str:
     """IDs the build uses that no checklist row claims.
 
@@ -118,7 +141,7 @@ def render(
     template_path: Path = TEMPLATE,
 ) -> str:
     sections = snapshot["result"]["sections"]
-    leftover = snapshot["result"].get("leftover_ids", [])
+    leftover = leftover_ids(snapshot, triage)
     total = sum(len(rows) for rows in sections.values())
     matched = sum(1 for rows in sections.values() for r in rows if r["found"])
 
