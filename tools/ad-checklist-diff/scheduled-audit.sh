@@ -13,7 +13,15 @@ set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHEET="${1:-${AD_AUDIT_SHEET:-}}"
-PYTHON="${AD_AUDIT_PYTHON:-$DIR/../../.venv/bin/python}"
+# Windows (Git Bash, chạy qua Task Scheduler) để venv ở Scripts/, nơi khác ở bin/.
+# Android SDK mặc định cũng khác chỗ theo hệ điều hành.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) VENV_BIN="Scripts"; SDK_DEFAULT="${LOCALAPPDATA:-$HOME/AppData/Local}/Android/Sdk" ;;
+  Darwin)               VENV_BIN="bin";     SDK_DEFAULT="$HOME/Library/Android/sdk" ;;
+  *)                    VENV_BIN="bin";     SDK_DEFAULT="$HOME/Android/Sdk" ;;
+esac
+PYTHON="${AD_AUDIT_PYTHON:-$DIR/../../.venv/$VENV_BIN/python}"
+[ -x "$PYTHON" ] || [ ! -x "$PYTHON.exe" ] || PYTHON="$PYTHON.exe"
 LOG="${AD_AUDIT_LOG:-$DIR/out/scheduled-audit.log}"
 MAX_LOG_LINES="${AD_AUDIT_LOG_LINES:-5000}"
 
@@ -26,7 +34,7 @@ mkdir -p "$(dirname "$LOG")"
 
 # adb chạy dưới cron không kế thừa PATH của shell đăng nhập; audit_runner cần
 # nó để đọc versionCode và kéo APK về.
-export PATH="${AD_AUDIT_ADB_PATH:-$HOME/Android/Sdk/platform-tools}:$PATH"
+export PATH="${AD_AUDIT_ADB_PATH:-$SDK_DEFAULT/platform-tools}:$PATH"
 
 # Ngay cả lượt "APK-only" cũng cần máy cắm: versionCode đọc từ `dumpsys` và
 # base APK phải pull về. Không có máy thì lượt này không làm được gì -- đó là
