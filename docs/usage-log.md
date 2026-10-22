@@ -21,6 +21,7 @@ Lượt không còn dòng chưa chốt thì không mở agent nào, tính ~3 ph�
 | 22/09/2026 | com.aienglishspeaking…aitutor | 6 | Sạch | 0 | `plans/reports/ad-checklist-audit-260922-1758-…` | ~3 phút | 30 phút | 27 phút |
 | 23/09/2026 | com.nxl.aiphotocreator…texttoimage | 17 | 54/54 | 0 | `plans/reports/ad-checklist-audit-260923-1547-…` | ~3 phút | 30 phút | 27 phút |
 | 10/10/2026 | com.hairai.hairstyletryon.haircolorchanger | 21 | 54/54, 5 ID ngoài checklist chờ ads team | 0 | [artifact](https://claude.ai/artifact/6ZFRdCkvAj9meWqyrqP2Wn) | ~3 phút | 30 phút | 27 phút |
+| 22/10/2026 | ai.photogenerator.aivideo.aivideogenerator.aiart | 29 | 1 xác nhận, 1 tranh chấp, 0 chưa chốt | 1 | [artifact](https://claude.ai/artifact/JiwHbfA3WgYGGB5673aS4y) | ? | 30 phút | ? |
 
 **Tổng:** 13 lần audit trên 9 app, test tay 390 phút, tool ~88 phút, tiết kiệm **~302 phút (~5 giờ)**.
 6 lỗi checklist xác nhận. Chưa có ticket Jira.
