@@ -50,6 +50,20 @@ Không có Claude Code thì chạy phần code trực tiếp:
 .venv/Scripts/python tools/ad-checklist-diff/audit_runner.py --capture --package <package>
 ```
 
+## Thông báo Discord
+
+Workflow báo lên Discord khi dừng giữa chừng (sai build, lỗi runner, thiếu tab, còn dòng cần người xem) và khi report được publish.
+
+1. Tạo webhook: Discord, Server Settings, Integrations, Webhooks, New Webhook, chọn kênh, Copy Webhook URL.
+2. Đặt biến môi trường (không commit URL vào repo):
+   ```bash
+   export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/<id>/<token>'
+   export DISCORD_ADS_TEAM_MENTION='<@&roleid>'   # tuỳ chọn: tag role ads team ở tin báo lỗi (hoặc <@userid>)
+   ```
+3. `DISCORD_NOTIFY=0` tắt hẳn việc gửi. Không đặt `DISCORD_WEBHOOK_URL` thì tool chỉ in một dòng cảnh báo rồi bỏ qua; gửi lỗi không bao giờ đổi exit code của lượt audit.
+
+Gửi tay: `.venv/Scripts/python tools/ad-checklist-diff/discord_notify.py --kind stop --title "..." --line "..."`.
+
 ## Test
 
 ```bash

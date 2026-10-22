@@ -61,6 +61,14 @@ if [ "$(wc -l < "$LOG")" -gt "$MAX_LOG_LINES" ]; then
   tail -n "$MAX_LOG_LINES" "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
 fi
 
+# Exit 2 = dòng mới lệch: báo lên Discord (no-op khi chưa đặt DISCORD_WEBHOOK_URL).
+# Không bao giờ đổi exit code của lượt audit.
+if [ "$status" -eq 2 ]; then
+  "$PYTHON" "$DIR/discord_notify.py" --kind stop --title "Audit định kỳ · có dòng mới lệch" \
+    --line "$(printf '%s\n' "$output" | tail -n 5 | tr '\n' ' ')" \
+    --action "Chạy /audit-fanout cho app bị lệch" >/dev/null 2>&1 || true
+fi
+
 # Im lặng khi mọi thứ bình thường; cron chỉ gửi mail khi thực sự có chuyện.
 if [ "$status" -ne 0 ]; then
   printf '%s\n' "$output"

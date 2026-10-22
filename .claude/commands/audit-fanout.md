@@ -34,6 +34,14 @@ của app không liên quan. Package id gõ sai thì phải hỏng ra mặt, đ�
 in registry ra và hỏi người dùng chọn. Không nêu app thì cũng **đừng chạy cả
 registry thay thế** — mỗi lượt là một app, do người dùng chỉ đích danh.
 
+Trước khi dừng, báo Discord (không có webhook thì lệnh tự bỏ qua, đừng dừng vì nó):
+
+```
+cd <repo> && <venv>/python tools/ad-checklist-diff/discord_notify.py --kind stop \
+  --title "Thiếu package · /audit-fanout" --line "Chưa có package id trong lệnh" \
+  --action "Gõ lại /audit-fanout <package>"
+```
+
 Có package thì phân giải nó — vẫn **đừng tự so chuỗi**:
 
 ```
@@ -48,7 +56,8 @@ Theo exit code:
 
 - `0` — phân giải được, chạy nó. In kèm `gid=… — từ sheet, chưa có trong
   registry` nghĩa là app chưa được ghi vào `apps.json`; vẫn chạy bình thường
-- `1` — **dừng**, in nguyên văn lý do. Ba lý do khác nhau, đừng gộp:
+- `1` — **dừng**, in nguyên văn lý do (hai lý do cuối `find_app.py` đã tự báo
+  Discord, đừng báo lại). Ba lý do khác nhau, đừng gộp:
   - *Không phải package id* — người dùng gõ tên app. Hỏi lại package
   - *Sheet không có tab nào khai package này* — chưa có checklist để đối chiếu.
     Không có gì để chạy; báo để nhờ ads-team thêm tab
@@ -153,18 +162,20 @@ Với mỗi app vừa chạy:
 4. Publish `<repo>/tools/ad-checklist-diff/out/<package>-artifact.html` bằng
    Artifact tool, rồi ghi lại link — **bước này bắt buộc, không phải tuỳ chọn**:
 
+   Trước đó ghi kết quả đã chốt vào `<repo>/tools/ad-checklist-diff/out/<package>-findings.json`:
+   `{"confirmed": [{"value": "<ID>", "placement": "<vị trí>"}], "disputed": <số>, "unresolved": <số>}`.
+   Lệnh dưới đọc file này để báo Discord và ghi `docs/usage-log.md`; thiếu file thì
+   chỉ báo phần tool tự biết.
+
    ```
    cd <repo> && <venv>/python tools/ad-checklist-diff/artifact_link.py \
-     --package <package> <url vừa publish>
+     --package <package> --findings-json tools/ad-checklist-diff/out/<package>-findings.json \
+     <url vừa publish>
    ```
 
-   **Đừng thêm `--no-open`.** Lệnh này vừa ghi link vừa bật browser, và nó là
-   lớp mở trang duy nhất chạy được ở đây. Artifact tool publish xong (nhất là
-   publish đè lên `url` có sẵn) không bật browser trên máy này, `action: "open"`
-   cũng không. Bỏ phần mở ở đây thì chạy xong người dùng chẳng thấy gì.
-
-   Vẫn in URL ra trong lời báo: browser có thể không mở được, và người ta còn
-   cần link để gửi cho ads-team.
+   Lệnh này không bật browser. Nó gửi **đúng một** tin Discord kèm link (gộp số
+   liệu, dòng confirmed, số dòng cần người xem) — người ta mở trang từ đó. Vẫn
+   in URL ra trong lời báo để người dùng gửi cho ads-team.
 
 Trang phải mở đầu bằng thống kê khớp/lệch rồi mới tới phần điều tra — builder
 lo sẵn phần đó. Một báo cáo mở đầu bằng đúng một dòng lệch đọc như tool chỉ tìm
@@ -187,6 +198,10 @@ Nói rõ: bao nhiêu dòng khớp / lệch mỗi app, link artifact, và ba nhó
 - `disputed` -- có luận điểm, phản biện làm nó đổ. **Cần người xem lại.**
 - `unresolved` -- agent tự nhận không đủ bằng chứng, chưa từng qua phản biện
   (không có gì để phản biện). Cũng cần người xem, nhưng vì lý do khác hẳn.
+
+App nào còn `disputed` / `unresolved` là việc để lại cho người. **Đừng gửi thêm
+tin Discord**: tin `artifact_link.py` gửi ở bước 3 đã có "Cần người xem lại: n
+dòng" và link — gửi tin nữa là link lặp lại trong kênh.
 
 App nào nằm trong `clean` thì không còn dòng nào chưa kết luận -- nói thẳng là
 sạch, đừng im lặng bỏ qua khiến người đọc tưởng nó bị lỗi.

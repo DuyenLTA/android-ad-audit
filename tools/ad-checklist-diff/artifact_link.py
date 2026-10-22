@@ -10,18 +10,14 @@ Each audited app has its own artifact, so those URLs are kept per package in
 already has a page, and publishes a second one -- the shared link people already
 have then quietly stops being the current report.
 
-Recording a URL opens it. There is exactly one reason a package's link gets
-written -- a run just finished and published its report -- so opening is what
-the caller wanted every time, and making it a flag only created a way to forget
-it. Reading a link back (`--show`) opens nothing: that runs *before* publishing,
-to find out whether a page already exists.
+Recording a URL does not open a browser: the Discord notice sent by
+`publish_notice.announce` carries the link, and that is where people pick it up.
 """
 import argparse
 import json
-import sys
-import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
+import publish_notice
 from console_encoding import use_utf8_console
 
 LINKS_FILE = Path(__file__).parent / "artifact-links.json"
@@ -55,34 +51,28 @@ def write_app_link(package: str, url: str, links_file: Path | None = None) -> di
     return links[package]
 
 
-def open_in_browser(url: str) -> bool:
-    """Open the page. False when there is no browser to open it in."""
-    try:
-        return webbrowser.open(url)
-    except Exception:
-        return False
-
-
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Ghi / mở link artifact")
+    parser = argparse.ArgumentParser(description="Ghi / tra link artifact")
     parser.add_argument("url", nargs="?", help="URL vừa publish")
     parser.add_argument("--package", required=True, help="app cần ghi / tra link")
-    parser.add_argument("--show", action="store_true", help="in link đã lưu, không mở")
-    # Kept so older callers still parse; opening is the default now.
+    parser.add_argument("--show", action="store_true", help="in link đã lưu")
+    parser.add_argument(
+        "--findings-json",
+        help="JSON agent ghi: confirmed [{value, placement}], disputed, unresolved -- cho thông báo Discord + usage-log",
+    )
+    # No-ops kept so callers written when recording a link opened the browser still parse.
     parser.add_argument("--open", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--no-open", dest="no_open", action="store_true", help="chỉ ghi link, đừng mở")
+    parser.add_argument("--no-open", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     if args.url:
         write_app_link(args.package, args.url)
+        # A fresh publish is the moment the report is final: tell Discord and log it.
+        publish_notice.announce(args.package, args.url, args.findings_json)
     url = args.url or read_app_link(args.package)
     if not url:
         raise SystemExit(f"Chưa có link nào cho {args.package}")
     print(url)
-    # Opens when a URL was just recorded. `--show` is the pre-publish lookup,
-    # so it stays silent in the browser.
-    if args.url and not args.no_open and not open_in_browser(url):
-        print("Không mở được trình duyệt ở máy này.", file=sys.stderr)
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ from pathlib import Path
 from app_label import match_apps, names_for, screen_name
 from app_registry import DEFAULT_REGISTRY, load_apps, registry_sheet, resolve_packages
 from device_apps import installed_packages, labels
+import discord_notify
 from sheet_tabs import gids_by_package
 from console_encoding import use_utf8_console
 
@@ -89,12 +90,27 @@ def _report_exact(query: str, registry: str) -> None:
     ambiguous case (two tabs) is refused rather than reported as a choice.
     """
     apps = load_apps(registry)
-    resolved = resolve_packages([query], apps, registry_sheet(registry))
+    try:
+        resolved = resolve_packages([query], apps, registry_sheet(registry))
+    except SystemExit as e:
+        _notify_tab_stop(query, str(e.code))
+        raise
     app = resolved[0]
     known = any(a["package"] == query for a in apps)
     shown = " · ".join(names_for(app)) if known else f"gid={app['gid']} — từ sheet, chưa có trong registry"
     print(f"{app['package']}  ({shown})")
     sys.exit(0)
+
+
+def _notify_tab_stop(package: str, reason: str) -> None:
+    """Discord the two refusals a person has to act on; typos are left to the agent."""
+    if "tab cùng khai" in reason:
+        action = "Chọn tab đúng rồi ghi vào apps.json"
+    elif "không có tab nào khai" in reason:
+        action = "Nhờ ads-team thêm tab checklist"
+    else:
+        return
+    discord_notify.send("stop", f"Không phân giải được tab · {package}", [reason], action=action)
 
 
 def _tab_for(package: str, registry: str, refresh: bool) -> str:

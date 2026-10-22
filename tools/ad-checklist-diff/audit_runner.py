@@ -42,6 +42,7 @@ from audit_snapshot import diff_results, load, save, triage
 from check_ads import DEFAULT_FILTERS
 from device_driver import capture_session
 from device_flow import DEFAULT_HOME_MATCH
+import discord_notify
 from console_encoding import use_utf8_console
 
 DEFAULT_OUT_DIR = Path(__file__).parent / "out"
@@ -470,6 +471,24 @@ def print_summary(results: list[dict]) -> None:
                 print(f"         luồng chưa tới Home: {', '.join(r['missed_home'])}")
 
 
+def notify_stops(results: list[dict]) -> None:
+    """Discord the outcomes that mean "no usable report" (exit 3 and exit 1).
+
+    A normal finish stays quiet here: the agent layer still has rows to judge.
+    """
+    for r in results:
+        package = r["package"]
+        if r.get("wrong_build"):
+            discord_notify.send(
+                "stop",
+                f"Sai build · {package} vc{r.get('version_code')}",
+                list(r["wrong_build"]),
+                action=f"Cài bản release rồi chạy lại /audit-fanout {package}",
+            )
+        elif r.get("error"):
+            discord_notify.send("stop", f"Lỗi runner · {package}", [str(r["error"])[:300]])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit app theo --package; không nêu thì cả registry")
     parser.add_argument(
@@ -530,6 +549,7 @@ def main() -> int:
         allow_dev_build=args.allow_dev_build,
     )
     print_summary(results)
+    notify_stops(results)
 
     return exit_code_for(results)
 
