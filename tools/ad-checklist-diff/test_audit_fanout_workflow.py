@@ -97,6 +97,19 @@ def test_audit_command_names_only_the_requested_package(tmp_path):
     assert f"/repo/.venv/bin/python tools/ad-checklist-diff/audit_runner.py --capture --package {PKG}" in prompt
 
 
+def test_serial_reaches_the_audit_command(tmp_path):
+    audit = {"exit_code": 0, "output": "", "apps": [{"package": PKG, "unsettled": 0}]}
+    result = run_workflow(tmp_path, {**BASE_ARGS, "serial": "R58M123ABC"}, audit=audit)
+    prompt = result["calls"][0]["prompt"]
+    assert f"audit_runner.py --capture --serial R58M123ABC --package {PKG}" in prompt
+
+
+def test_serial_with_shell_characters_is_refused(tmp_path):
+    result = run_workflow(tmp_path, {**BASE_ARGS, "serial": "x; rm -rf /"})
+    assert "serial không hợp lệ" in result["error"]
+    assert labels(result) == []
+
+
 def test_clean_app_opens_no_judge_or_verify_agent(tmp_path):
     audit = {"exit_code": 0, "output": "", "apps": [{"package": PKG, "unsettled": 0}]}
     result = run_workflow(tmp_path, BASE_ARGS, audit=audit)

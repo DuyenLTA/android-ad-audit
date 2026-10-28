@@ -58,6 +58,12 @@ if (!python) {
 }
 const auditMode = args?.audit ?? 'capture'
 const force = args?.force === true
+// Several phones plugged in (the rc-check bot runs one per phone): without a
+// serial the capture drives whichever phone adb picks, or fails outright.
+const serial = args?.serial
+if (serial && !/^[A-Za-z0-9.:_-]+$/.test(serial)) {
+  throw new Error(`args.serial không hợp lệ: ${serial}`)
+}
 
 if (apps.length === 0) {
   // Without this the pipeline quietly runs over nothing and returns an empty
@@ -278,7 +284,8 @@ if (auditMode !== 'skip') {
   // them -- and a capture `pm clear`s each app it visits, wiping the data of
   // apps nobody asked about.
   const only = apps.map((pkg) => ` --package ${pkg}`).join('')
-  const flags = (auditMode === 'capture' ? ' --capture' : '') + (force ? ' --force' : '') + only
+  const flags = (auditMode === 'capture' ? ' --capture' : '') + (force ? ' --force' : '') +
+    (serial ? ` --serial ${serial}` : '') + only
   // Deliberately one agent running one command: the verdicts stay Python's, and
   // an agent that starts improvising flags is an agent rewriting the audit.
   const audit = await agent(

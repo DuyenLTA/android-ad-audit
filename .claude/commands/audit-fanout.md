@@ -1,6 +1,6 @@
 ---
-description: Audit checklist quảng cáo cho một app theo package, rồi xuất báo cáo artifact
-argument-hint: "<package> [--skip|--apk] [--force]"
+description: Audit checklist quảng cáo cho một hoặc nhiều app theo package, rồi xuất báo cáo artifact
+argument-hint: "<package> [<package> ...] [--skip|--apk] [--force] [--serial <serial>]"
 ---
 
 Chạy workflow `audit-fanout` rồi xuất báo cáo. Tham số người dùng đưa vào: $ARGUMENTS
@@ -25,6 +25,9 @@ gọi — đường dẫn tương đối là cách chắc chắn nhất để n�
 
 ## 1. Lấy package
 
+Một lượt nhận **một hoặc nhiều** package, cách nhau bằng khoảng trắng. Mọi chuỗi
+trong `$ARGUMENTS` không bắt đầu bằng `--` đều là một package cần phân giải.
+
 Command này **chỉ nhận package id**, không nhận tên app. Khớp theo tên là khớp
 mờ: gõ thiếu một ký tự thì nó trả về app hàng xóm chứ không trả về lỗi, và lượt
 capture mặc định `pm clear` đúng cái app nó nhận được — sai app là xoá dữ liệu
@@ -32,7 +35,7 @@ của app không liên quan. Package id gõ sai thì phải hỏng ra mặt, đ�
 
 `$ARGUMENTS` không có chuỗi nào trông như package (`com.abc.xyz`) thì **dừng**,
 in registry ra và hỏi người dùng chọn. Không nêu app thì cũng **đừng chạy cả
-registry thay thế** — mỗi lượt là một app, do người dùng chỉ đích danh.
+registry thay thế** — lượt chạy chỉ đụng tới những app người dùng chỉ đích danh.
 
 Trước khi dừng, báo Discord (không có webhook thì lệnh tự bỏ qua, đừng dừng vì nó):
 
@@ -42,7 +45,7 @@ cd <repo> && <venv>/python tools/ad-checklist-diff/discord_notify.py --kind stop
   --action "Gõ lại /audit-fanout <package>"
 ```
 
-Có package thì phân giải nó — vẫn **đừng tự so chuỗi**:
+Có package thì phân giải **từng cái một** — vẫn **đừng tự so chuỗi**:
 
 ```
 cd <repo> && <venv>/python tools/ad-checklist-diff/find_app.py --exact "<package>"
@@ -64,6 +67,23 @@ Theo exit code:
   - *Sheet có 2 tab cùng khai package này* — chọn bừa là đối chiếu nhầm
     checklist. **Hỏi người dùng** tab nào đúng, rồi ghi entry vào `apps.json`
     với `gid` đó
+
+Nhiều package thì "dừng" ở trên nghĩa là **loại package đó khỏi lượt**, không
+phải huỷ cả lượt: các package phân giải được vẫn chạy, package bị loại được nêu
+lại kèm lý do trong lời báo. Package trùng nhau thì chỉ giữ một. Ca 2 tab cùng
+khai package thì hỏi người dùng **trước khi** gọi workflow, gộp mọi câu hỏi vào
+một lần hỏi. Sau khi lọc mà không còn package nào thì mới dừng hẳn.
+
+Trừ khi có `--skip`, lọc thêm app chưa cài trên máy — cả `capture` lẫn `apk`
+đều lấy APK từ máy:
+
+```
+adb shell pm path <package>
+```
+
+Không in ra dòng `package:` nào thì loại app đó, lý do "chưa cài trên máy". Lọc
+ở đây vì runner gặp app thiếu chỉ in `[lỗi]` rồi đi tiếp, còn workflow thì không
+nhận ra lỗi đó và vẫn đưa app cho agent phán trên một triage không tồn tại.
 
 Muốn app khỏi phải tra sheet mỗi lượt thì ghi nó vào registry một lần:
 
@@ -90,12 +110,19 @@ nên script chạy ở đâu cũng đọc đúng repo.
 
 Rồi gọi Workflow tool với `scriptPath: "<scratchpad>/audit-fanout.mjs"` và args:
 
-- `apps`: danh sách package lấy ở bước 1. Bắt buộc, không bao giờ để rỗng.
+- `apps`: **tất cả** package phân giải được ở bước 1, trong một lần gọi. Bắt
+  buộc, không bao giờ để rỗng. Đừng gọi workflow một lần cho mỗi app: capture
+  lái chung một máy, hai lượt chạy cùng lúc là log app này lẫn vào app kia và
+  `pm clear` chéo nhau. Trong một lần gọi, runner tự capture lần lượt từng app,
+  còn phần agent điều tra thì chạy song song.
 - `repoDir`: `<repo>`
 - `toolDir`: `<repo>/tools/ad-checklist-diff`
 - `python`: `<venv>/python` (đường dẫn tuyệt đối)
 - `audit`: `"capture"` mặc định · `"apk"` nếu có cờ `--apk` · `"skip"` nếu có cờ `--skip`
 - `force`: `true` nếu có cờ `--force`
+- `serial`: giá trị của `--serial` nếu có. Cắm nhiều máy thì **bắt buộc**: thiếu nó
+  capture lái máy adb tự chọn, có khi là máy của lượt khác. Lệnh `adb shell pm path`
+  ở bước 1 cũng kèm `-s <serial>`
 
 Đừng dùng `name: "audit-fanout"`: tên chỉ phân giải được khi phiên mở đúng tại
 repo root. Cũng đừng đọc file rồi truyền vào `script` — script dài vài trăm dòng,
@@ -105,9 +132,13 @@ Mặc định `capture` sẽ lái máy thật và chạy `pm clear` trên app �
 hoạt động bình thường của tool, không phải thao tác nguy hiểm, cứ chạy. Có nói
 trong lời báo là đã capture lại, đừng dừng lại hỏi chọn chế độ.
 
+Nhiều app thì phần capture mất vài phút mỗi app. Báo người dùng một câu là
+workflow đang chạy bao nhiêu app, rồi chờ thông báo xong, đừng poll.
+
 ## 3. Xuất báo cáo artifact
 
-Với mỗi app vừa chạy:
+Với mỗi app vừa chạy — mỗi app một trang riêng, một link riêng, kể cả app
+`clean` (trang vẫn có thống kê khớp/lệch):
 
 1. Viết mảnh HTML phần điều tra vào `<repo>/tools/ad-checklist-diff/out/<package>-findings.html`
    và phần việc-cần-làm vào `…/out/<package>-notes.html`, dựa trên `confirmed` /
@@ -184,13 +215,18 @@ lo sẵn phần đó. Một báo cáo mở đầu bằng đúng một dòng lệ
 ## 4. Báo cáo markdown
 
 Ghi báo cáo vào `<repo>/plans/reports/` — đây là file mà bước 3 truyền vào
-`--report`, nên viết nó trước khi dựng trang.
+`--report`, nên viết nó trước khi dựng trang. Nhiều app thì viết **một** báo cáo
+cho cả lượt, mỗi app một mục, và mọi trang đều truyền cùng file đó.
 
 **Dừng ở đây. Không `git add`, không `git commit`, không `git push`.** Lượt audit
 chỉ sinh ra file; đưa file nào vào lịch sử git là việc của người dùng, không
 phải của command. Muốn commit thì người dùng sẽ tự nói.
 
 ## Báo lại
+
+Nhiều app thì mở đầu bằng một bảng, mỗi app một dòng: package · khớp/tổng ·
+confirmed / disputed / unresolved · tới Home chưa · link. Package bị loại ở
+bước 1 nêu ngay dưới bảng, kèm lý do.
 
 Nói rõ: bao nhiêu dòng khớp / lệch mỗi app, link artifact, và ba nhóm kết quả:
 

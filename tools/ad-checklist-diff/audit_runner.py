@@ -519,6 +519,11 @@ def main() -> int:
     )
     parser.add_argument("--timeout", type=int, default=300, help="Giới hạn mỗi luồng khi capture, giây")
     args = parser.parse_args()
+    if args.serial:
+        # apk_source and versionCode reads call bare `adb`; with several phones
+        # plugged in they fail or hit the wrong one. adb reads ANDROID_SERIAL
+        # for every call, so set it once instead of threading it everywhere.
+        os.environ["ANDROID_SERIAL"] = args.serial
 
     registry = args.registry or DEFAULT_REGISTRY
     apps = load_apps(registry)
