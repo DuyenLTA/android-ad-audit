@@ -90,6 +90,12 @@ def _has_label(node: str) -> bool:
 
 def find_continue_center(xml: str) -> tuple[int, int] | None:
     """Centre of the screen's primary continue button, or None if none fits."""
+    b = find_continue_bounds(xml)
+    return ((b[0] + b[2]) // 2, (b[1] + b[3]) // 2) if b else None
+
+
+def find_continue_bounds(xml: str) -> tuple[int, int, int, int] | None:
+    """Bounds of the screen's primary continue button, or None if none fits."""
     width, height = screen_extent(xml)
     if not width or not height:
         return None
@@ -121,5 +127,5 @@ def find_continue_center(xml: str) -> tuple[int, int] | None:
         # that stacks a link over a button puts the button underneath.
         rank = (0 if by_id else 1, -cy)
         if best is None or rank < best[0]:
-            best = (rank, (cx, cy))
+            best = (rank, b)
     return best[1] if best else None

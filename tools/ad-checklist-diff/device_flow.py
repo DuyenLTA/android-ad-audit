@@ -20,8 +20,9 @@ splash -> language -> onboarding (next, next, swipe, get started) -> question
 from device_language_picker import DEFAULT_LANGUAGE
 from device_language_picker import pick as pick_language
 from device_close_button import find_close_center
-from device_continue_button import find_continue_center
-from device_ui import find_node_center, key_event, swipe_left, tap
+from device_continue_button import find_continue_bounds
+from device_popup_windows import popup_frames, uncovered_point
+from device_ui import find_node_center, key_event, screen_extent, swipe_left, tap
 
 # Any language would reach Home, but the capture is read by people afterwards
 # and a run in हिन्दी is a run nobody can check. See device_language_picker for
@@ -138,11 +139,19 @@ def perform_step(step: dict, xml_fn, run, sleep=None) -> str | None:
         tap(*center, run=run)
         return "close"
     if "tap_continue" in step:
-        center = find_continue_center(xml_fn())
-        if not center:
+        xml = xml_fn()
+        bounds = find_continue_bounds(xml)
+        if not bounds:
             return None
-        tap(*center, run=run)
-        return "continue"
+        # Test devices stack the native-ad validator popup over the middle of
+        # the button: tap the part it leaves uncovered (see device_popup_windows).
+        width, height = screen_extent(xml)
+        covers = popup_frames(run(["shell", "dumpsys", "input"]), width, height)
+        point = uncovered_point(bounds, covers)
+        if not point:
+            return None
+        tap(*point, run=run)
+        return "continue" if not covers else f"continue (né popup @ {point[0]},{point[1]})"
     if "swipe" in step:
         swipe_left(run=run)
         return "swipe"
