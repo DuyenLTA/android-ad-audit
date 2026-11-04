@@ -1,0 +1,603 @@
+{
+  "tabs": [
+    "Đối tác",
+    "Ad_VN",
+    "Sub_VN"
+  ],
+  "kinds": {
+    "auto": "tool tự chấm từ logcat / UI dump / foreground",
+    "visual": "Claude chấm trên ảnh",
+    "auto_visual": "tool chấm trước, không chắc thì Claude nhìn ảnh",
+    "na": "không áp dụng cho Android"
+  },
+  "checkers": [
+    {
+      "id": "inter_loading_before",
+      "kind": "auto",
+      "placement": "inter",
+      "rules": [
+        {
+          "tab": "Ad_VN",
+          "no": "1",
+          "text_hash": "aed9b2fd"
+        }
+      ]
+    },
+    {
+      "id": "inter_latency",
+      "kind": "auto",
+      "placement": "inter",
+      "params": {
+        "max_seconds": 1.0
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "2",
+          "text_hash": "f1dc088e"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "3",
+          "text_hash": "f1dc088e"
+        }
+      ]
+    },
+    {
+      "id": "inter_changes_screen",
+      "kind": "auto",
+      "placement": "inter",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "1",
+          "text_hash": "cd1dc2fb"
+        }
+      ]
+    },
+    {
+      "id": "inter_not_before_splash",
+      "kind": "auto",
+      "placement": "inter",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "3",
+          "text_hash": "e4e24d0f"
+        }
+      ]
+    },
+    {
+      "id": "inter_close_within_15s",
+      "kind": "auto",
+      "placement": "inter",
+      "params": {
+        "max_seconds": 15
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "5",
+          "text_hash": "4b992a9f"
+        }
+      ]
+    },
+    {
+      "id": "inter_click_handled",
+      "kind": "auto",
+      "placement": "inter",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "4",
+          "text_hash": "fa28ef2d"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "12",
+          "text_hash": "fa28ef2d"
+        }
+      ]
+    },
+    {
+      "id": "resume_background_opaque",
+      "kind": "visual",
+      "placement": "resume",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "6",
+          "text_hash": "e30562f9"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "14",
+          "text_hash": "e30562f9"
+        }
+      ]
+    },
+    {
+      "id": "resume_not_after_utility",
+      "kind": "auto",
+      "placement": "resume",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "7",
+          "text_hash": "ecc0b5ce"
+        },
+        {
+          "tab": "Đối tác",
+          "no": "8",
+          "text_hash": "07f07458"
+        }
+      ]
+    },
+    {
+      "id": "resume_click_handled",
+      "kind": "auto",
+      "placement": "resume",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "9",
+          "text_hash": "fa28ef2d"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "17",
+          "text_hash": "fa28ef2d"
+        }
+      ]
+    },
+    {
+      "id": "no_ad_on_webview",
+      "kind": "auto",
+      "placement": "any",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "10",
+          "text_hash": "e4e65bd7"
+        },
+        {
+          "tab": "Đối tác",
+          "no": "14",
+          "text_hash": "e4e65bd7"
+        },
+        {
+          "tab": "Đối tác",
+          "no": "21",
+          "text_hash": "e4e65bd7"
+        }
+      ]
+    },
+    {
+      "id": "no_ad_on_empty_screen",
+      "kind": "visual",
+      "placement": "banner_native",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "16",
+          "text_hash": "d70a5538"
+        },
+        {
+          "tab": "Đối tác",
+          "no": "23",
+          "text_hash": "d70a5538"
+        }
+      ]
+    },
+    {
+      "id": "banner_placeholder_first",
+      "kind": "auto",
+      "placement": "banner",
+      "params": {
+        "max_seconds": 0.5
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "11",
+          "text_hash": "b5d24aec"
+        },
+        {
+          "tab": "Đối tác",
+          "no": "13",
+          "text_hash": "7ff40d95"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "18",
+          "text_hash": "b5d24aec"
+        }
+      ]
+    },
+    {
+      "id": "banner_placeholder_size",
+      "kind": "auto",
+      "placement": "banner",
+      "params": {
+        "min_ratio": 0.75
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "12",
+          "text_hash": "271f2c17"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "19",
+          "text_hash": "271f2c17"
+        }
+      ]
+    },
+    {
+      "id": "banner_content_overlap",
+      "kind": "auto",
+      "placement": "banner",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "15",
+          "text_hash": "c58964f4"
+        }
+      ]
+    },
+    {
+      "id": "banner_click_handled",
+      "kind": "auto",
+      "placement": "banner",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "17",
+          "text_hash": "fa28ef2d"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "26",
+          "text_hash": "fa28ef2d"
+        }
+      ]
+    },
+    {
+      "id": "native_placeholder_first",
+      "kind": "auto",
+      "placement": "native",
+      "params": {
+        "max_seconds": 0.5
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "18",
+          "text_hash": "b5d24aec"
+        },
+        {
+          "tab": "Đối tác",
+          "no": "20",
+          "text_hash": "7ff40d95"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "27",
+          "text_hash": "b5d24aec"
+        }
+      ]
+    },
+    {
+      "id": "native_placeholder_size",
+      "kind": "auto",
+      "placement": "native",
+      "params": {
+        "min_ratio": 0.75
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "19",
+          "text_hash": "64299ac6"
+        }
+      ]
+    },
+    {
+      "id": "native_content_overlap",
+      "kind": "auto",
+      "placement": "native",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "22",
+          "text_hash": "c58964f4"
+        }
+      ]
+    },
+    {
+      "id": "native_layout_not_clipped",
+      "kind": "visual",
+      "placement": "native",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "24",
+          "text_hash": "9c78a655"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "35",
+          "text_hash": "9c78a655"
+        }
+      ]
+    },
+    {
+      "id": "native_background_differs",
+      "kind": "visual",
+      "placement": "native",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "25",
+          "text_hash": "2fcaae88"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "36",
+          "text_hash": "2fcaae88"
+        }
+      ]
+    },
+    {
+      "id": "native_adchoices_inside",
+      "kind": "auto",
+      "placement": "native",
+      "params": {
+        "min_inside_ratio": 0.5
+      },
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "26",
+          "text_hash": "06fc837f"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "37",
+          "text_hash": "06fc837f"
+        }
+      ]
+    },
+    {
+      "id": "native_attribution_min_size",
+      "kind": "auto",
+      "placement": "native",
+      "params": {
+        "min_px": 15
+      },
+      "rules": [
+        {
+          "tab": "Ad_VN",
+          "no": "38",
+          "text_hash": "163ab264"
+        }
+      ]
+    },
+    {
+      "id": "native_mediaview_min_size",
+      "kind": "auto",
+      "placement": "native",
+      "params": {
+        "min_dp": 120
+      },
+      "rules": [
+        {
+          "tab": "Ad_VN",
+          "no": "41",
+          "text_hash": "1cae2703"
+        }
+      ]
+    },
+    {
+      "id": "native_cta_click_handled",
+      "kind": "auto",
+      "placement": "native",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "29",
+          "text_hash": "6fd6ac9a"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "42",
+          "text_hash": "6fd6ac9a"
+        }
+      ]
+    },
+    {
+      "id": "reward_has_watch_ad_label",
+      "kind": "auto_visual",
+      "placement": "reward",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "30",
+          "text_hash": "e0754e13"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "43",
+          "text_hash": "e0754e13"
+        }
+      ]
+    },
+    {
+      "id": "reward_click_handled",
+      "kind": "auto",
+      "placement": "reward",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "31",
+          "text_hash": "fa28ef2d"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "48",
+          "text_hash": "fa28ef2d"
+        }
+      ]
+    },
+    {
+      "id": "external_link_has_ad_label",
+      "kind": "visual",
+      "placement": "app",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "32",
+          "text_hash": "1f12b27d"
+        }
+      ]
+    },
+    {
+      "id": "ai_result_has_report_button",
+      "kind": "visual",
+      "placement": "app",
+      "rules": [
+        {
+          "tab": "Đối tác",
+          "no": "33",
+          "text_hash": "ed7b507f"
+        },
+        {
+          "tab": "Ad_VN",
+          "no": "h35ec827d",
+          "text_hash": "35ec827d"
+        }
+      ]
+    },
+    {
+      "id": "sub_plan_info_complete",
+      "kind": "auto_visual",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "1",
+          "text_hash": "2104366a"
+        }
+      ]
+    },
+    {
+      "id": "sub_trial_then_price",
+      "kind": "auto_visual",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "2",
+          "text_hash": "f6310786"
+        }
+      ]
+    },
+    {
+      "id": "sub_trial_not_separate_button",
+      "kind": "auto",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "3",
+          "text_hash": "34dccac6"
+        }
+      ]
+    },
+    {
+      "id": "sub_trial_text_smaller",
+      "kind": "visual",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "4",
+          "text_hash": "7be52000"
+        }
+      ]
+    },
+    {
+      "id": "sub_billing_popup_dates",
+      "kind": "auto_visual",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "5",
+          "text_hash": "e3ea77dd"
+        }
+      ]
+    },
+    {
+      "id": "sub_sale_shows_both_prices",
+      "kind": "auto_visual",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "6",
+          "text_hash": "3a9ae8dc"
+        }
+      ]
+    },
+    {
+      "id": "sub_cancel_anytime_text",
+      "kind": "auto",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "7",
+          "text_hash": "1b02aff1"
+        }
+      ]
+    },
+    {
+      "id": "sub_privacy_tos_in_app",
+      "kind": "auto",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "8",
+          "text_hash": "407f86a9"
+        }
+      ]
+    },
+    {
+      "id": "sub_cancel_option_after_purchase",
+      "kind": "auto",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "9",
+          "text_hash": "191733e3"
+        }
+      ]
+    },
+    {
+      "id": "sub_ios_restore",
+      "kind": "na",
+      "placement": "sub",
+      "rules": [
+        {
+          "tab": "Sub_VN",
+          "no": "10",
+          "text_hash": "c266e57f"
+        }
+      ]
+    }
+  ]
+}

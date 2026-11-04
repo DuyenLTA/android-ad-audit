@@ -1,0 +1,84 @@
+<title>{{TITLE}}</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: inspection sheet — header strip, status counters, attention list, then rules by ad format */
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --fg:#1d2330; --muted:#5f6878; --line:#dfe3ea; --accent:#3d4fd6;
+  --pass:#1f7a4d; --pass-bg:#e3f3ea; --fail:#b42318; --fail-bg:#fde7e4; --look:#9a5b00; --look-bg:#fdf0d8;
+  --blocked:#5a3fb5; --blocked-bg:#ece7fb; --na:#677084; --na-bg:#eceef2;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#12151b; --panel:#1a1e26; --fg:#e6e9ef; --muted:#9aa3b2; --line:#2b313c; --accent:#8d9bff;
+  --pass:#5fd39a; --pass-bg:#173326; --fail:#ff8a7a; --fail-bg:#3a1d1a; --look:#f3b95a; --look-bg:#3a2c12;
+  --blocked:#b8a4ff; --blocked-bg:#2a2244; --na:#a3aab8; --na-bg:#252a33; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12151b; --panel:#1a1e26; --fg:#e6e9ef; --muted:#9aa3b2; --line:#2b313c; --accent:#8d9bff;
+  --pass:#5fd39a; --pass-bg:#173326; --fail:#ff8a7a; --fail-bg:#3a1d1a; --look:#f3b95a; --look-bg:#3a2c12;
+  --blocked:#b8a4ff; --blocked-bg:#2a2244; --na:#a3aab8; --na-bg:#252a33; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans)}
+.wrap{max-width:1080px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
+header{display:grid;gap:6px}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:28px;line-height:1.2;margin:0;text-wrap:balance}
+.meta{color:var(--muted);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 16px}
+.meta code,.files code{font-family:var(--mono);font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.tile{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:12px 14px;text-align:left;cursor:pointer;display:grid;gap:2px;color:var(--fg);font:inherit}
+.tile b{font:600 26px/1 var(--mono);font-variant-numeric:tabular-nums}
+.tile span{font-size:12px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.tile.pass b{color:var(--pass)}.tile.fail b{color:var(--fail)}.tile.look b{color:var(--look)}.tile.blocked b{color:var(--blocked)}.tile.na b{color:var(--na)}
+.tile[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.tile:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.box h2{font-size:16px;margin:0 0 10px}
+.box ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.box li{display:grid;gap:2px}
+.box small,.reason{color:var(--muted);font-size:13.5px}
+.journey{font:13px/1.6 var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.group{display:grid;gap:8px}
+.group h2{font-size:18px;margin:8px 0 2px}.group h2 small{font:500 12px var(--mono);color:var(--muted);margin-left:6px}
+.rule{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.rule summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:11px 14px;cursor:pointer;list-style:none}
+.rule summary::-webkit-details-marker{display:none}
+.rule .t{min-width:0}
+.refs{font:12px var(--mono);color:var(--muted);white-space:nowrap}
+.rule>:not(summary){margin:0 14px 12px}
+.pill{display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.05em;padding:5px 8px;border-radius:999px;white-space:nowrap}
+.pill.pass{background:var(--pass-bg);color:var(--pass)}.pill.fail{background:var(--fail-bg);color:var(--fail)}
+.pill.look{background:var(--look-bg);color:var(--look)}.pill.blocked{background:var(--blocked-bg);color:var(--blocked)}.pill.na{background:var(--na-bg);color:var(--na)}
+.by{font:11px var(--mono);color:var(--accent);margin-left:6px}
+.also{color:var(--muted);font-size:13px;padding-left:18px}
+.ev{display:flex;flex-wrap:wrap;gap:10px}
+.ev figure{margin:0;display:grid;gap:4px}
+.ev figure.shot{width:150px}.ev figure.sheet{width:100%;max-width:900px}
+.ev img{width:100%;border:1px solid var(--line);border-radius:6px;display:block}
+.ev figcaption,.files{font:11px var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.filtered .rule:not(.show){display:none}
+@media (max-width:640px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.rule summary{grid-template-columns:auto minmax(0,1fr)}.refs{grid-column:2;white-space:normal}h1{font-size:23px}}
+</style>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Policy ads + sub · máy thật</div>
+    <h1>{{APP}}</h1>
+    <div class="meta"><span><code>{{PKG}}</code></span><span>Máy <code>{{DEVICE}}</code></span><span>Lượt <code>{{RUN}}</code></span><span>Nguồn rule: sheet Apero Policy (Đối tác + Ad_VN + Sub_VN)</span></div>
+  </header>
+  <div class="tiles" role="group" aria-label="Lọc theo trạng thái">{{TILES}}</div>
+  <section class="box"><h2>Cần xử lý</h2><ul>{{ATTENTION}}</ul></section>
+  <section class="box" {{NOTES_HIDDEN}}><h2>Ghi nhận ngoài sheet</h2><ul>{{NOTES}}</ul></section>
+  <section class="box"><h2>Đường đã lái</h2><p class="journey">{{JOURNEY}}</p></section>
+  <main id="rules">{{GROUPS}}</main>
+</div>
+<script>
+(function(){
+  var main=document.getElementById('rules'), tiles=document.querySelectorAll('.tile'), cur='';
+  tiles.forEach(function(t){t.setAttribute('aria-pressed','false');t.addEventListener('click',function(){
+    cur = cur===t.dataset.filter ? '' : t.dataset.filter;
+    tiles.forEach(function(x){x.setAttribute('aria-pressed', String(x.dataset.filter===cur));});
+    main.classList.toggle('filtered', !!cur);
+    main.querySelectorAll('.rule').forEach(function(r){r.classList.toggle('show', r.dataset.status===cur); if(cur) r.open = r.dataset.status===cur && (cur==='fail'||cur==='look');});
+  });});
+})();
+</script>

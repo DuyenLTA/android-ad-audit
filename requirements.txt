@@ -2,3 +2,5 @@
 requests>=2.31
 # Tests
 pytest>=8.0
+# tools/ad-policy-check: ffmpeg binary for cutting frames out of the screen recording
+imageio-ffmpeg>=0.5
