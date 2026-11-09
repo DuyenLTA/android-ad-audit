@@ -40,6 +40,8 @@ def grade(run_dir: Path, off_sub: str | None = None) -> dict:
     run = load_run(run_dir)
     results = []
     for c in reg["checkers"]:
+        if c["kind"] == "ios_only":
+            continue                  # the tool checks Android only: iOS rules are skipped, not graded N/A
         fn = ALL.get(c["id"])
         if fn is None:
             res = {"status": "CAN_XEM", "reason": "chưa có code chấm cho checker này — chấm tay", "evidence": []}
@@ -61,7 +63,7 @@ def grade(run_dir: Path, off_sub: str | None = None) -> dict:
     if run.meta.get("error") or not run.meta.get("reached_home"):
         why = run.meta.get("error") or f"không tới được Home (dừng ở {run.meta.get('stopped_at')})"
         for r in results:
-            if r["status"] == "NA" and r["checker"] != "sub_ios_restore":
+            if r["status"] == "NA":
                 r["status"], r["reason"] = "BLOCKED", f"lượt dừng sớm ({why}) — {r['reason']}"
     if off_sub:
         mark_off_sub(results, off_sub)
@@ -89,7 +91,8 @@ def apply_visual(run_dir: Path, verdict_path: Path) -> dict:
             continue
         if v["status"] not in STATUSES:
             raise SystemExit(f"{r['checker']}: trạng thái lạ {v['status']!r}")
-        r["status"], r["reason"], r["judged_by"] = v["status"], v["reason"], "Claude nhìn ảnh"
+        r["status"], r["reason"], r["judged_by"] = v["status"], v["reason"], v.get("judged_by", "Claude nhìn ảnh")
+        r["evidence"] = list(dict.fromkeys(r.get("evidence", []) + v.get("evidence", [])))
     (run_dir / "results.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
     return out
 
@@ -107,7 +110,17 @@ def main() -> int:
     print(" · ".join(f"{k} {v}" for k, v in counts.items()))
     for r in out["results"]:
         print(f"  {r['status']:8} {r['checker']}: {r['reason'][:110]}")
+    open_items = unresolved(out)
+    if open_items:
+        # The report only goes out with every rule settled (user, 09/11/2026): PASS / FAIL, or N/A when the
+        # app has no such thing. Each open item needs a follow-up run on the device or Claude's verdict.
+        print(f"CÒN {len(open_items)} MỤC CHƯA CHỐT: " + ", ".join(open_items))
+        return 2
     return 0
+
+
+def unresolved(out: dict) -> list[str]:
+    return [r["checker"] for r in out["results"] if r["status"] in ("CAN_XEM", "BLOCKED")]
 
 
 if __name__ == "__main__":

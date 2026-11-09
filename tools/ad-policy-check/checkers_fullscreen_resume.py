@@ -92,6 +92,10 @@ def inter_close_within_15s(run: Run, params: dict) -> dict:
 
 def _click(run: Run, kind: str) -> dict:
     tries = [p for p in run.probes if p["kind"] == kind]
+    # A tap that only paused a video creative was followed by a tap on the CTA it revealed: the ad is
+    # judged on that last tap of the chain.
+    followed = {p["follow_up_of"] for p in tries if "follow_up_of" in p}
+    tries = [p for p in tries if p["t"] not in followed]
     if not tries:
         return {"status": BLOCKED, "reason": "lượt này chưa bấm thử được loại ad này", "evidence": []}
     bad = [p for p in tries if p["handled"] is False]
@@ -101,10 +105,20 @@ def _click(run: Run, kind: str) -> dict:
     if bad:
         status = FAIL
     elif unclear:
-        status = CAN_XEM          # moved to another app screen: the app's own navigation, or the ad?
+        # Moved to another app screen: the app's own navigation, or the ad? Claude decides from the
+        # frames around the tap (visual queue), never left open.
+        status = CAN_XEM
     else:
         status = PASS
-    return {"status": status, "reason": f"bấm {len(tries)} lần: {rows}", "evidence": ["click-probes.jsonl"]}
+    out = {"status": status, "reason": f"bấm {len(tries)} lần: {rows}", "evidence": ["click-probes.jsonl"]}
+    if unclear and not bad:
+        shots = [run.rel(s) for p in unclear
+                 if (s := run.video_sheet(p["t"] - 1000, p["t"] + 4000, f"click-{kind}-{p['t']}", fps=2)) is not None]
+        out["evidence"] += shots
+        out["visual"] = {"images": shots, "question": "Mỗi ô 0,5s quanh lần bấm vào ad. Sau khi bấm, màn mới là trang "
+                                                      "của ad (landing/store/ad mở rộng) hay chỉ là app tự chuyển màn? "
+                                                      "Trang của ad → PASS, app tự chuyển/không gì → FAIL."}
+    return out
 
 
 def inter_click_handled(run: Run, params: dict) -> dict:
@@ -119,8 +133,9 @@ def resume_background_opaque(run: Run, params: dict) -> dict:
     if not run.resume_window():
         return {"status": BLOCKED, "reason": "lượt này chưa chạy bước ẩn app rồi mở lại", "evidence": []}
     if not resume_window_ads(run):
-        return {"status": NA, "reason": "mở lại app ở Home không hiện resume ad (đúng luật: Home không resume) — "
-                                        "không có ad resume để xem nền", "evidence": ["activities.jsonl"]}
+        where = (run.jsonl("resume-trials.jsonl") or [{}])[0].get("screen") or "Home"
+        return {"status": NA, "reason": f"ẩn rồi mở lại app ở {_short(where)} không hiện resume ad (app không bật "
+                                        "resume) — không có ad resume để xem nền", "evidence": ["activities.jsonl"]}
     w = run.resume_window()
     s = run.video_sheet(w[0]["t"], w[-1]["t"] + 6000, "resume")
     rel = [run.rel(s)] if s else []

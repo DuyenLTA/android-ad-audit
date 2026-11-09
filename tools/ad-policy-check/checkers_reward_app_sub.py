@@ -170,10 +170,6 @@ def sub_cancel_option_after_purchase(run: Run, params: dict) -> dict:
             "evidence": ["purchase.json"]}
 
 
-def sub_ios_restore(run, params):
-    return {"status": NA, "reason": "rule chỉ cho iOS", "evidence": []}
-
-
 def reward_has_watch_ad_label(run: Run, params: dict) -> dict:
     marks = [f for f in run.frames if any(REWARD_RE.search(t) for t in f.texts())]
     if not marks:
@@ -223,5 +219,5 @@ def ai_result_has_report_button(run: Run, params: dict) -> dict:
 CHECKERS = {f.__name__: f for f in (
     sub_plan_info_complete, sub_trial_then_price, sub_trial_text_smaller, sub_trial_not_separate_button,
     sub_sale_shows_both_prices, sub_cancel_anytime_text, sub_privacy_tos_in_app, sub_billing_popup_dates,
-    sub_cancel_option_after_purchase, sub_ios_restore, reward_has_watch_ad_label, reward_click_handled,
+    sub_cancel_option_after_purchase, reward_has_watch_ad_label, reward_click_handled,
     external_link_has_ad_label, ai_result_has_report_button)}

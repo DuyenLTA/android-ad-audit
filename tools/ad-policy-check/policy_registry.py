@@ -20,7 +20,7 @@ from pathlib import Path
 from policy_source import fetch_policy_rules
 
 MAP_PATH = Path(__file__).resolve().parent / "policy-checkers.json"
-KINDS = {"auto", "visual", "auto_visual", "na"}
+KINDS = {"auto", "visual", "auto_visual", "ios_only"}
 
 
 def load_checker_map(path: Path = MAP_PATH) -> dict:

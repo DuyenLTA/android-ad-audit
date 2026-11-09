@@ -179,3 +179,21 @@ def test_off_sub_turns_blocked_sub_rules_into_na():
            {"checker": "inter_click_handled", "status": "BLOCKED", "reason": "y"}]
     mark_off_sub(res, "plan tuần ghi Off subs")
     assert [r["status"] for r in res] == ["NA", "FAIL", "BLOCKED"]
+
+
+def test_inter_judged_on_cta_tap_after_pausing_tap(tmp_path):
+    # AIP872 05/11/2026: the first tap paused the video and showed "More"; the follow-up tap opens the landing.
+    probes = [{"t": 100, "kind": "fullscreen", "activity": AD, "tap": [540, 1320], "after": AD, "handled": False,
+               "left_app": False},
+              {"t": 4200, "kind": "fullscreen", "activity": AD, "tap": [900, 2200],
+               "after": "com.android.chrome/x.Chrome", "handled": True, "left_app": True, "follow_up_of": 100}]
+    assert inter_click_handled(run(tmp_path, probes=probes), {})["status"] == "PASS"
+    probes[1]["handled"], probes[1]["after"] = False, AD
+    assert inter_click_handled(run(tmp_path, probes=probes), {})["status"] == "FAIL"
+
+
+def test_report_gate_lists_open_items():
+    from policy_check_runner import unresolved
+    out = {"results": [{"checker": "a", "status": "PASS"}, {"checker": "b", "status": "CAN_XEM"},
+                       {"checker": "c", "status": "BLOCKED"}, {"checker": "d", "status": "NA"}]}
+    assert unresolved(out) == ["b", "c"]

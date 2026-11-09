@@ -8,7 +8,7 @@
     "auto": "tool tự chấm từ logcat / UI dump / foreground",
     "visual": "Claude chấm trên ảnh",
     "auto_visual": "tool chấm trước, không chắc thì Claude nhìn ảnh",
-    "na": "không áp dụng cho Android"
+    "ios_only": "rule chỉ cho iOS: tool chỉ check Android nên bỏ hẳn, không chấm, không lên report"
   },
   "checkers": [
     {
@@ -589,7 +589,7 @@
     },
     {
       "id": "sub_ios_restore",
-      "kind": "na",
+      "kind": "ios_only",
       "placement": "sub",
       "rules": [
         {

@@ -1,4 +1,4 @@
-# Plan: tự check policy Ads + Sub trên máy thật
+﻿# Plan: tự check policy Ads + Sub trên máy thật
 
 Nguồn rule: sheet "Apero Policy" (`17r_R39x2F8RyQDBgHUeq5jWwzAGS92yQNb9RXS4-NLA`)
 - Ad_VN: 19 rule · Đối tác: 33 rule (bao trùm Ad_VN, thêm resume/webview/no-data/close 15s/link "AD") · Sub_VN: 10 rule · Ads_ENG: bản EN
@@ -31,7 +31,7 @@ MVP = phase 1→4 với Inter + Native + Banner + "click ad có xử lý". Phase
 ## Phân loại nhanh (chi tiết ở phase 1)
 - **Tool tự chấm (~55%)**: loading trước inter, inter hiện ngay sau click, nút tắt ≤15s, tắt inter có chuyển màn, inter không trước splash, click ad/CTA có xử lý, không ad trên màn webview, ad/content đè nhau, MediaView ≥120dp, Attribution ≥15px, AdChoices trong khung, loading ≥3/4 kích thước ad, loading có ngay từ đầu, resume không show sau permission/rate/privacy, Privacy/ToS mở in-app
 - **Claude nhìn ảnh (~35%)**: nền resume trong suốt, bố cục native bị cắt, màu nền ad vs app, màn không có data mà vẫn đặt ad, dấu "Watch an ad" của reward, nút link ngoài có chữ "AD", nút report của app AI, thông tin paywall (giá/quyền lợi/thời hạn/trial/sale/cancel anytime), cỡ chữ trial
-- **N/A**: Restore (chỉ iOS). Popup thanh toán Play + cancel sub sau khi mua: tool tự mua bằng tài khoản license test
+- **Bỏ hẳn (tool chỉ check Android, 09/11/2026)**: Restore (chỉ iOS). Popup thanh toán Play + cancel sub sau khi mua: tool tự mua bằng tài khoản license test
 
 ## Phụ thuộc
 - Flow lái app: dùng lại `flows/<package>.yaml` của `auto-check-event-tracking` (record-flow)

@@ -322,18 +322,15 @@ class HomeExplorer:
                     break
                 xml = await asyncio.to_thread(self._dump)
                 xy = find_close_center(xml) if xml else None
-                if xy and time.monotonic() > end - REWARD_MAX_SECONDS + 15:   # at least 15s watched
-                    if not clicked:
-                        # Close control shown = reward earned: now the creative can be tapped without
-                        # losing it ("click vào ad có xử lý" for the reward placement).
-                        clicked = True
-                        ad_nodes = parse_nodes(xml)
-                        cta = next((n for n in ad_nodes if n["text"].strip().lower() in
-                                    ("learn more", "install", "open", "visit", "download", "get")), None)
-                        cxy = center(cta["bounds"]) if cta else (540, 1300)
-                        act = await a_top_activity(self.serial) or ""
-                        await self.ev.prober._tap_and_observe("reward_creative", act, cxy)
-                        continue
+                watched_enough = time.monotonic() > end - REWARD_MAX_SECONDS + 15   # 30s in: reward earned
+                if not clicked and watched_enough:
+                    # Reward earned (close shown, or 30s watched; test creatives draw X outside the tree):
+                    # now the creative can be tapped without losing it ("click vào ad có xử lý" for reward).
+                    clicked = True
+                    act = await a_top_activity(self.serial) or ""
+                    await self.ev.prober.tap_fullscreen("reward_creative", act, parse_nodes(xml))
+                    continue
+                if xy and clicked:
                     await a_tap(self.serial, *xy)
             if is_fullscreen_ad_activity(await a_top_activity(self.serial)):
                 await a_key(self.serial, "KEYCODE_BACK")

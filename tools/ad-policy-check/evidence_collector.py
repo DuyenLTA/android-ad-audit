@@ -46,7 +46,10 @@ from evidence_click_probe import ClickProber  # noqa: E402
 from evidence_home_explorer import HomeExplorer  # noqa: E402
 from evidence_sub_purchase import purchase_pass  # noqa: E402
 from evidence_screenrecord import ScreenRecorder  # noqa: E402
-from ui_nodes import parse_nodes  # noqa: E402
+from ui_nodes import is_fullscreen_ad_activity, parse_nodes  # noqa: E402
+import re  # noqa: E402
+
+TUTORIAL_RESUME_RE = re.compile(r"onboarding(?!.*question)", re.I)
 
 OUT_ROOT = HERE / "out"
 ACTIVITY_POLL_SECONDS = 0.5
@@ -63,7 +66,7 @@ def _ms(t0: float) -> int:
 def _sample_activities(serial: str, t0: float, path: Path, stop: threading.Event) -> None:
     """Thread: write the resumed activity every time it changes."""
     last = None
-    with path.open("w", encoding="utf-8") as f:
+    with path.open("a", encoding="utf-8") as f:     # append: a follow-up pass continues the same run
         while not stop.is_set():
             try:
                 act = top_activity(serial)
@@ -85,6 +88,7 @@ class Evidence:
 
     def __init__(self, serial: str, package: str, frames: Path, t0: float, prober: ClickProber):
         self.serial, self.package, self.frames, self.t0, self.prober = serial, package, frames, t0, prober
+        self.resume_tried = False
 
     def save(self, xml: str) -> None:
         if "<hierarchy" not in (xml or ""):
@@ -104,6 +108,13 @@ class Evidence:
                 f"màn hình đang là app {stranger}, không phải app đang check: có phiên khác lái chung máy")
         # walk_to names the activity without its package; the prober compares full names.
         full = activity if "/" in activity else f"{self.package}/{activity}"
+        if not self.resume_tried and TUTORIAL_RESUME_RE.search(full):
+            self.resume_tried = True
+            try:
+                await _tutorial_resume_trial(self.serial, self.package, self.prober, self.frames.parent, self.t0)
+            except Exception as exc:  # best effort; driving must go on
+                print(f"[resume] bỏ qua: {exc}")
+            return                         # back on the same Onboarding screen; no ad probe on this read
         try:
             await self.prober.maybe_probe(full, nodes, xml)
         except Exception as exc:  # probing is best effort; driving must go on
@@ -136,6 +147,30 @@ def _hook_fullscreen_probe(prober: ClickProber, serial: str):
 
     ui_dump.dump = dump
     return original
+
+
+async def _tutorial_resume_trial(serial: str, package: str, prober: ClickProber, out_dir: Path, t0: float) -> None:
+    """Resume ads show only inside the tutorial (Language / Onboarding), never on Home (rule QA settled):
+    hide the app on the first Onboarding screen, reopen it from the launcher, and if a resume ad shows,
+    let the recording see it over the app, then tap it once (resume click rule) and close it."""
+    screen = top_activity(serial) or ""
+    adb(serial, "shell", "input", "keyevent", "KEYCODE_HOME")
+    await asyncio.sleep(RESUME_AWAY_SECONDS)
+    adb(serial, "shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1")
+    ad = None
+    for _ in range(16):
+        await asyncio.sleep(0.5)
+        act = await a_top_activity(serial) or ""
+        if is_fullscreen_ad_activity(act):
+            ad = act
+            break
+    if ad:
+        await asyncio.sleep(4)            # several seconds of the ad over the app for the background rule
+        nodes = parse_nodes(await asyncio.to_thread(_dump_ui, serial))
+        await prober.tap_fullscreen("resume", ad, nodes)
+        await prober._close_fullscreen_with_back()
+    with (out_dir / "resume-trials.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps({"t": _ms(t0), "screen": screen, "ad": ad}, ensure_ascii=False) + "\n")
 
 
 async def _resume_pass(client, serial: str, package: str, ev: Evidence) -> None:

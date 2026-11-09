@@ -37,7 +37,8 @@ cd <tool> && PYTHONIOENCODING=utf-8 <rc>/.venv/Scripts/python -W ignore evidence
 ```
 
 Chạy ~6-8 phút: `pm clear` → FO tới Home bằng `rcr.fo_flow.walk_to` (bấm thử CTA native, inter từ cái thứ 2,
-link Privacy trên paywall) → Home/mở lại (resume) → dò Home (Settings + Privacy/Terms/Share/Rate, màn nội dung,
+link Privacy trên paywall; ở màn Onboarding đầu tiên ẩn app rồi mở lại để bắt resume ad — resume chỉ có trong
+tutorial — rồi bấm thử nó) → Home/mở lại (Home không được có resume) → dò Home (Settings + Privacy/Terms/Share/Rate, màn nội dung,
 paywall qua nút Pro) → mua sub test → tìm "Cancel sub" trong app → huỷ trên Play. In ra `<run-dir>`.
 
 - Exit 3 = máy đang có lượt khác giữ khóa `<rc>/out/.may-<serial>.lock` → dừng, báo, không chen.
@@ -64,13 +65,31 @@ Ra `results.json` (mỗi checker: PASS / FAIL / CAN_XEM / BLOCKED / NA + lý do 
 
 Đọc `visual-queue.json`; với mỗi mục **Read từng ảnh** trong `images` (sheet video 1 ô/giây, ảnh màn) và trả lời
 đúng `question` theo chữ của rule. Luật:
-- Chỉ chấm theo rule + ví dụ trong sheet; không chắc → `CAN_XEM` kèm điều cần người nhìn, không đoán PASS.
+- Kết luận **chỉ PASS hoặc FAIL** (user chốt 09/11/2026: không để Cần xem / BLOCKED / chờ người). Chấm theo chữ
+  rule + ví dụ trong sheet. Ảnh chưa đủ để kết luận → lấy thêm bằng chứng (sheet video dày hơn qua
+  `Run.video_sheet`, ảnh khác trong `frames/`, dòng `logcat.txt`) hoặc lái máy đo lại (mục 4b), không đoán PASS.
 - Ảnh màn được chụp **ngay sau** dump nên có thể lệch vài trăm ms; dump và ảnh mâu thuẫn → tin dump, ghi rõ.
 - Nút X / đếm ngược: đếm ô từ ô đầu có ad. Inter **đầu tiên** không bị bấm thử (để đo X); inter đã bấm thử
   dừng video nên X có thể không hiện — đừng chấm X trên inter đó.
 
-Ghi `<run-dir>/visual-verdicts.json` = `{checker_id: {"status": "...", "reason": "..."}}` rồi gộp:
-`policy_check_runner.py <run-dir> --visual <run-dir>/visual-verdicts.json`.
+Ghi `<run-dir>/visual-verdicts.json` = `{checker_id: {"status": "...", "reason": "...", "evidence": [...]?,
+"judged_by": "..."?}}` rồi gộp: `policy_check_runner.py <run-dir> --visual <run-dir>/visual-verdicts.json`.
+
+## 4b. Chốt hết BLOCKED / Cần xem — bắt buộc trước report
+
+`policy_check_runner.py` (cả khi gộp `--visual`) exit 2 và in `CÒN n MỤC CHƯA CHỐT` khi còn CAN_XEM/BLOCKED;
+`policy_report.py` cũng từ chối ra report khi còn. Gỡ từng mục theo thứ tự:
+
+1. **Chạy bổ sung trên máy** (lượt chính không tới được Settings / màn tiện ích, kết quả AI, paywall, mua sub):
+   `cd <tool> && PYTHONIOENCODING=utf-8 <rc>/.venv/Scripts/python -W ignore evidence_followup.py <run-dir> --serial <serial> [--no-sub]`
+   — mở lại app (không `pm clear`), dò Home + mua sub, ghi nối vào cùng `<run-dir>`; rồi chấm lại (mục 3–4).
+   Driver kẹt ở màn lạ → sửa `evidence_home_explorer.py` (thêm test từ dump màn đó), chạy lại.
+2. **Claude tự lái máy** bằng adb khi tool vẫn chưa tạo được điều kiện: tới đúng màn rule cần, chụp
+   `screencap` + `uiautomator dump` vào `<run-dir>/manual/`, đo/nhìn, ghi verdict PASS/FAIL với `evidence`
+   là các file đó và `"judged_by": "Claude lái tay"`. Lỗi tool gặp lúc này → sửa tool cho lượt sau.
+3. **N/A chỉ khi app thật sự không có thứ rule nói tới** — phải có căn cứ, ghi vào lý do: app Off subs
+   (`--off-sub`), checklist ads của app không có vị trí reward/banner, app không có tính năng AI tạo nội dung,
+   resume đã thử ở tutorial mà không bật. "Lượt này chưa gặp" chưa phải căn cứ → quay lại bước 1–2.
 
 ## 5. Rà FAIL giả và PASS giả — bắt buộc trước khi báo
 
@@ -82,7 +101,9 @@ Mở bằng chứng của **mọi FAIL** và mọi PASS dựa trên đo đạc l
 - khung native không id: tool lấy node nhỏ nhất bao media + CTA + nhãn Ad (không dùng AdChoices để dựng khung).
 
 Cách hiểu user đã chốt (04/11/2026): link Privacy / Terms mở ra ngoài app là **đạt** (chỉ cần có và bấm mở được);
-không có free trial thì rule trial **N/A**; paywall không có sale hiện 2 giá là **FAIL**; Restore chỉ iOS → **N/A**.
+không có free trial thì rule trial **N/A**; paywall không có sale hiện 2 giá là **FAIL**. Tool chỉ check **Android**: rule chỉ dành cho iOS (Restore,
+Sub_VN #10 — kind `ios_only` trong `policy-checkers.json`) bị bỏ hẳn, không chấm, không lên report (user chốt
+09/11/2026). Sheet thêm rule iOS mới → map vào checker `ios_only`, đừng để nó thành "rule chưa có checker".
 FAIL thật phải có bằng chứng chỉ ra được (ảnh / dòng log / toạ độ). Một lượt bằng chứng chắc là đủ, không chạy lặp để xác nhận.
 
 ## 6. Ghi nhận ngoài sheet
@@ -103,7 +124,7 @@ artifact, chỉ đưa link.
 
 ## 8. Báo lại
 
-Mở đầu bằng link artifact, rồi: app + version + máy; số PASS/FAIL/Cần xem/BLOCKED/N/A; từng FAIL kèm bằng chứng
-một dòng; mục Cần xem nói rõ cần nhìn gì; BLOCKED nói thiếu điều kiện gì; ghi nhận ngoài sheet; trạng thái sub
+Mở đầu bằng link artifact, rồi: app + version + máy; số PASS/FAIL/N/A; từng FAIL kèm bằng chứng một dòng; N/A kèm
+căn cứ; mục nào Claude lái tay mới chốt được thì nói rõ; ghi nhận ngoài sheet; trạng thái sub
 (đã huỷ chưa). Lượt chạy từ tin build trong qa-auto thì gửi kết quả vào qa-auto (trả lời dưới tin build).
 Không commit gì nếu user chưa bảo.

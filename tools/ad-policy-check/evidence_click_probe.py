@@ -15,9 +15,9 @@ import re
 import time
 from pathlib import Path
 
-from adb_sync import a_key, a_tap, a_top_activity
+from adb_sync import a_key, a_tap, a_top_activity, safe_dump
 from device_close_button import find_close_center
-from ui_nodes import norm_activity, banner_node, center, first, is_fullscreen_ad_activity, native_parts
+from ui_nodes import norm_activity, banner_node, center, first, is_fullscreen_ad_activity, native_parts, parse_nodes
 
 HANDLED_WAIT_SECONDS = 3.0
 MAX_BACKS = 3
@@ -67,7 +67,7 @@ class ClickProber:
         except Exception:
             return None
 
-    async def _tap_and_observe(self, kind: str, activity: str, xy: tuple[int, int]) -> None:
+    async def _tap_and_observe(self, kind: str, activity: str, xy: tuple[int, int], extra: dict | None = None) -> dict:
         before = norm_activity(activity)
         t = self._ms()
         self.last_tap = time.monotonic()
@@ -90,7 +90,7 @@ class ClickProber:
         else:
             handled = "unclear"
         record = {"t": t, "kind": kind, "activity": before, "tap": list(xy),
-                  "after": after, "handled": handled, "left_app": left_app}
+                  "after": after, "handled": handled, "left_app": left_app, **(extra or {})}
         with self.log_path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
         # Come back to where the tap started, so the flow runner finds its screen.
@@ -101,6 +101,13 @@ class ClickProber:
             await a_key(self.serial, "KEYCODE_BACK")
             await asyncio.sleep(1.5)
         await asyncio.sleep(RETURN_SETTLE_SECONDS)
+        return record
+
+    def _cta_after_pause(self) -> tuple[int, int] | None:
+        """A first tap on a video creative often only pauses it and reveals a CTA ("More", "Install"...)."""
+        nodes = parse_nodes(safe_dump(self.serial, "/sdcard/policy-probe.xml"))
+        cta = first(nodes, lambda n: (n["text"] or n["desc"]).strip().lower() in FULLSCREEN_CTA_WORDS + ("more",))
+        return center(cta["bounds"]) if cta else None
 
     async def _close_fullscreen_with_back(self) -> None:
         """After a tap the creative is paused and its X may never come; BACK closes it."""
@@ -127,12 +134,20 @@ class ClickProber:
             return False
         self.fullscreen_tapped = True
         self.fullscreen_probes += 1
+        await self.tap_fullscreen("fullscreen", activity, nodes)
+        await self._close_fullscreen_with_back()
+        return True
+
+    async def tap_fullscreen(self, kind: str, activity: str, nodes: list[dict]) -> None:
+        """Tap a full-screen creative's CTA (or its middle); if that only paused it, tap the CTA it revealed."""
         cta = first(nodes, lambda n: n["text"].strip().lower() in FULLSCREEN_CTA_WORDS)
         # No labelled CTA: middle of the creative, below the header where close/skip live.
         xy = center(cta["bounds"]) if cta else (self.width // 2, int(self.height * 0.55))
-        await self._tap_and_observe("fullscreen", activity, xy)
-        await self._close_fullscreen_with_back()
-        return True
+        rec = await self._tap_and_observe(kind, activity, xy)
+        if rec["handled"] is False and is_fullscreen_ad_activity(await self._foreground()):
+            xy2 = await asyncio.to_thread(self._cta_after_pause)
+            if xy2:
+                await self._tap_and_observe(kind, activity, xy2, {"follow_up_of": rec["t"]})
 
     async def maybe_probe(self, activity: str | None, nodes: list[dict], xml: str) -> bool:
         """Probe at most one ad on this screen. True when a tap happened (caller re-dumps)."""

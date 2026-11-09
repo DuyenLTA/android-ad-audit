@@ -122,6 +122,11 @@ def main() -> int:
     ap.add_argument("--notes", type=Path, help="JSON [{title, detail}] ghi nhận ngoài sheet")
     ap.add_argument("--out", type=Path)
     args = ap.parse_args()
+    from policy_check_runner import unresolved
+    open_items = unresolved(json.loads((args.run_dir / "results.json").read_text(encoding="utf-8")))
+    if open_items:
+        print("Chưa ra report: còn mục Cần xem/BLOCKED chưa chốt — " + ", ".join(open_items))
+        return 2
     notes = json.loads(args.notes.read_text(encoding="utf-8")) if args.notes else []
     out = args.out or args.run_dir / "policy-report.html"
     out.write_text(build(args.run_dir, args.app, notes, args.title), encoding="utf-8")
