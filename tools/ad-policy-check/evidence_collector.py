@@ -183,7 +183,7 @@ async def _resume_pass(client, serial: str, package: str, ev: Evidence) -> None:
         await asyncio.to_thread(ev.save, await asyncio.to_thread(_dump_ui, serial))
 
 
-async def collect(package: str, serial: str, fresh: bool, buy_sub: bool = True) -> Path:
+async def collect(package: str, serial: str, fresh: bool, buy_sub: bool = True, keep_session: bool = False) -> Path:
     out_dir = OUT_ROOT / package / time.strftime("%y%m%d-%H%M%S")
     frames = out_dir / "frames"
     frames.mkdir(parents=True, exist_ok=True)
@@ -192,9 +192,16 @@ async def collect(package: str, serial: str, fresh: bool, buy_sub: bool = True) 
     density = adb(serial, "shell", "wm", "density").strip().split()[-1]
     t0 = time.monotonic()
 
-    await device_app.force_stop(client, serial, package)
-    if fresh:
-        adb(serial, "shell", "pm", "clear", package)
+    # keep_session: the tester picked an ad source in Ad Inspector (shake); that choice lives only in the
+    # running process, so neither force-stop nor pm clear may touch the app.
+    if not keep_session:
+        await device_app.force_stop(client, serial, package)
+        if fresh:
+            adb(serial, "shell", "pm", "clear", package)
+    # The app's own heads-up notification ("daily lesson") drops over the top bar and swallows taps on
+    # Next / Continue; mute heads-up for the run, restore the tester's setting afterwards.
+    heads_up = adb(serial, "shell", "settings", "get", "global", "heads_up_notifications_enabled").strip()
+    adb(serial, "shell", "settings", "put", "global", "heads_up_notifications_enabled", "0")
     adb(serial, "logcat", "-c")
     stop = threading.Event()
     sampler = threading.Thread(target=_sample_activities, args=(serial, t0, out_dir / "activities.jsonl", stop),
@@ -227,6 +234,8 @@ async def collect(package: str, serial: str, fresh: bool, buy_sub: bool = True) 
         raise
     finally:
         ui_dump.dump = original_dump
+        adb(serial, "shell", "settings", "put", "global", "heads_up_notifications_enabled",
+            heads_up if heads_up in ("0", "1") else "1")
         stop.set()
         segments = []
         # Each cleanup step on its own: one failing (a pull timing out) must not leave adb logcat
@@ -281,6 +290,8 @@ def main() -> int:
     ap.add_argument("--serial", required=True)
     ap.add_argument("--no-sub", action="store_true", help="không chạy lượt mua sub")
     ap.add_argument("--no-fresh", action="store_true", help="không pm clear (luồng user cũ)")
+    ap.add_argument("--keep-session", action="store_true",
+                    help="không force-stop, không pm clear: giữ nguồn ad đã chọn trong Ad Inspector (lắc máy)")
     args = ap.parse_args()
     busy_sub = active_test_sub(args.package)
     if busy_sub:
@@ -288,7 +299,8 @@ def main() -> int:
         return 5
     try:
         with hold_device(args.serial):
-            out = asyncio.run(collect(args.package, args.serial, fresh=not args.no_fresh, buy_sub=not args.no_sub))
+            out = asyncio.run(collect(args.package, args.serial, fresh=not (args.no_fresh or args.keep_session),
+                                     buy_sub=not args.no_sub, keep_session=args.keep_session))
     except BlockingIOError as exc:
         print(f"Dừng: {exc}. Chờ lượt đó xong rồi chạy lại.")
         return 3

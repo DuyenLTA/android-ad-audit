@@ -27,9 +27,18 @@ def safe_dump(serial: str, remote: str) -> str:
     """uiautomator dump that never hands back an older file: remove first, check the result,
     retry once (a dump during a window change fails with "null root node"). "" when it failed."""
     for _ in range(2):
-        adb(serial, "shell", "rm", "-f", remote)
-        adb(serial, "shell", "uiautomator", "dump", remote, timeout=60)
-        xml = adb(serial, "exec-out", "cat", remote, timeout=60)
+        try:
+            adb(serial, "shell", "rm", "-f", remote)
+            adb(serial, "shell", "uiautomator", "dump", remote, timeout=60)
+            xml = adb(serial, "exec-out", "cat", remote, timeout=60)
+        except subprocess.TimeoutExpired:
+            # uiautomator waits for the UI to go idle; a screen that never stops animating (a looping
+            # video in a popup) hangs it. Kill the stuck dumper and try again instead of ending the pass.
+            try:
+                adb(serial, "shell", "pkill", "-f", "uiautomator", timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+            continue
         if "<hierarchy" in xml:
             return xml
     return ""

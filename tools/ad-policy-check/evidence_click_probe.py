@@ -34,7 +34,25 @@ AFTER_TAP_GRACE_SECONDS = 15
 # video creative often does nothing, which would read as "click not handled".
 PAYWALL_MARKERS = ("Billing", "Paywall", "Premium", "Subscription", "Iap", "Purchase")
 PRIVACY_RE = re.compile(r"privacy|quyền riêng tư|chính sách bảo mật", re.I)
-FULLSCREEN_CTA_WORDS = ("learn more", "install", "open", "visit", "download", "get", "shop", "play")
+# GMA localises them with the phone language: a Vietnamese phone shows "Xem Thêm" (AIP920 1.6.0).
+FULLSCREEN_CTA_WORDS = ("learn more", "install", "open", "visit", "download", "get", "shop", "play",
+                        "xem thêm", "tìm hiểu thêm", "cài đặt", "mở", "truy cập", "tải xuống", "mua ngay", "chơi")
+
+
+# Labels on a full-screen creative that are NOT its call to action.
+NOT_CTA_RE = re.compile(r"^(close|skip|đóng|bỏ qua|ad|ads|quảng cáo|sponsored|\d+|x|×)$|seconds?|giây", re.I)
+
+
+def fullscreen_cta(nodes: list[dict]) -> dict | None:
+    """The creative's CTA: a known word, else (creatives in any language, e.g. "了解详情") the lowest labelled
+    button that is not close/skip/the Ad badge."""
+    label = lambda n: (n["text"] or n["desc"]).strip()
+    known = first(nodes, lambda n: label(n).lower() in FULLSCREEN_CTA_WORDS + ("more",))
+    if known:
+        return known
+    buttons = [n for n in nodes if label(n) and not NOT_CTA_RE.search(label(n))
+               and (n["clickable"] or "Button" in n["cls"])]
+    return max(buttons, key=lambda n: n["bounds"][3], default=None)
 
 
 class ClickProber:
@@ -105,8 +123,7 @@ class ClickProber:
 
     def _cta_after_pause(self) -> tuple[int, int] | None:
         """A first tap on a video creative often only pauses it and reveals a CTA ("More", "Install"...)."""
-        nodes = parse_nodes(safe_dump(self.serial, "/sdcard/policy-probe.xml"))
-        cta = first(nodes, lambda n: (n["text"] or n["desc"]).strip().lower() in FULLSCREEN_CTA_WORDS + ("more",))
+        cta = fullscreen_cta(parse_nodes(safe_dump(self.serial, "/sdcard/policy-probe.xml")))
         return center(cta["bounds"]) if cta else None
 
     async def _close_fullscreen_with_back(self) -> None:

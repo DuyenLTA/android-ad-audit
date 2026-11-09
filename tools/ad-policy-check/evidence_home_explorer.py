@@ -18,9 +18,11 @@ from pathlib import Path
 
 from adb_sync import a_key, a_tap, a_top_activity, adb, safe_dump
 from device_close_button import find_close_center
+from evidence_chat_reward import chat_until_reward
+from evidence_in_app_questionnaire import walk_questionnaire
 from ui_nodes import center, is_fullscreen_ad_activity, parse_nodes
 
-CLOSE_RE = re.compile(r"^(close|đóng|x|skip|bỏ qua|later|not now|để sau)$", re.I)
+CLOSE_RE = re.compile(r"^(close|đóng|x|skip|bỏ qua|later|maybe later|not now|no thanks|để sau)$", re.I)
 # Icon-only close buttons carry no text, only an id: the rate dialog's "btnDismiss", "ivClose", "img_close"...
 CLOSE_ID_RE = re.compile(r"(^|[_/])(btn|iv|img|ic|image|button)?_?(close|dismiss|cancel|exit)$", re.I)
 UPLOAD_RE = re.compile(r"tap to upload|upload (image|photo)|add (image|photo)|tải ảnh|chọn ảnh|thêm ảnh", re.I)
@@ -45,6 +47,7 @@ GENERATE_WAIT_SECONDS = 120
 RESUME_WATCH_SECONDS = 6
 MAX_UTILITIES = 5
 MAX_CONTENT = 2
+POPUP_SETTLE_SECONDS = 3
 
 
 def _label(n: dict) -> str:
@@ -125,14 +128,32 @@ class HomeExplorer:
         return None
 
     async def close_popups(self) -> None:
-        for _ in range(3):
-            _act, nodes = await self.look()
+        # A raw dump, not look(): with a popup still up, the frame would go into the evidence and the
+        # prober would tap the "banner" under it - the popup's own button gets the tap (seen on AIP920:
+        # a Check-In sheet over the Home banner read as content overlapping the ad, and a click not handled).
+        for _ in range(4):
+            nodes = parse_nodes(await asyncio.to_thread(self._dump))
             closes = popup_closes(nodes, self.package)
             if not closes:
                 return
             # The popup drawn last sits on top; its close control comes last in the dump.
             await a_tap(self.serial, *center(closes[-1]["bounds"]))
             await asyncio.sleep(1.5)
+
+    async def close_fullscreen_ad(self, wait_seconds: int = 30) -> None:
+        """Close an interstitial that came up on a Home action. The new GMA SDK's AdActivity ignores
+        BACK, so wait for its Close / X (countdown first) and tap it; BACK only as the last resort."""
+        end = time.monotonic() + wait_seconds
+        while time.monotonic() < end and is_fullscreen_ad_activity(await a_top_activity(self.serial)):
+            xml = await asyncio.to_thread(self._dump)
+            xy = find_close_center(xml) if xml else None
+            if not xy:
+                label = next((n for n in parse_nodes(xml) if CLOSE_RE.match(_label(n))), None)
+                xy = center(label["bounds"]) if label else None
+            if xy:
+                await a_tap(self.serial, *xy)
+            await asyncio.sleep(2)
+        await self.back_to_app()
 
     async def _watch_for_ad(self) -> str | None:
         end = time.monotonic() + RESUME_WATCH_SECONDS
@@ -350,15 +371,16 @@ class HomeExplorer:
             await asyncio.sleep(2)
 
     async def explore(self) -> dict:
+        await walk_questionnaire(self.serial, self.package)
+        await asyncio.sleep(POPUP_SETTLE_SECONDS)     # Home popups (check-in, widget, rate) come a moment later
         await self.close_popups()
         home, nodes = await self.look()
         done = {"utilities": 0, "content": 0, "paywall": False}
         for n in self._find(nodes, CONTENT_RE, MAX_CONTENT):
             await a_tap(self.serial, *center(n["bounds"]))
             await asyncio.sleep(3)
-            if await self._watch_for_ad():        # an inter on content entry: let X come, then BACK
-                await asyncio.sleep(6)
-                await self.back_to_app()
+            if await self._watch_for_ad():        # an inter on content entry: let X come, then close it
+                await self.close_fullscreen_ad()
             _a, seen = await self.look()
             done["content"] += 1
             if not done.get("ai_result"):
@@ -368,6 +390,10 @@ class HomeExplorer:
             await asyncio.sleep(2)
             await self.back_to_app()
             await self.close_popups()
+        if not done.get("reward"):
+            # AI chat apps: the rewarded ad sits behind the free-message limit of a chat.
+            done["reward"] = await chat_until_reward(self, self.ev.prober.width, self.ev.prober.height)
+        await self.close_popups()
         _home, nodes = await self.look()
         settings = self._find(nodes, SETTINGS_RE, 1)
         if settings:
@@ -380,6 +406,7 @@ class HomeExplorer:
             await a_key(self.serial, "KEYCODE_BACK")
             await asyncio.sleep(2)
             await self.back_to_app()
+        await self.close_popups()
         _home, nodes = await self.look()
         pro = self._find(nodes, PRO_RE, 1)
         if pro:

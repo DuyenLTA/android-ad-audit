@@ -132,7 +132,7 @@ async def purchase_pass(ex, out_dir: Path) -> dict:
         rec["cancel_option_opens"] = act
         page = await _wait_play_page(ex, step)
         rec["cancel_page_texts"] = [n["text"] for n in page if n["text"].strip()][:30]
-        sheet_name = next((t for t in rec.get("billing_sheet_texts", [])[1:3] if " - " in t), "")
+        sheet_name = _app_name_on_sheet(rec.get("billing_sheet_texts", []))
         rec["cancelled"] = await _cancel_on_play(ex, page, step, sheet_name)
     else:
         rec["cancelled"] = False
@@ -140,6 +140,13 @@ async def purchase_pass(ex, out_dir: Path) -> dict:
     await ex.back_to_app()
     rec["result"] = "đã mua" + (", đã huỷ trên Play" if rec.get("cancelled") else ", CHƯA huỷ được sub")
     return _save(out_dir, rec)
+
+
+def _app_name_on_sheet(texts: list[str]) -> str:
+    """Play's billing sheet: plan name, then the app's title ("<app> - <tagline>" on some apps, a plain
+    title like "Lingix: AI Tutor Vocab Builder" on others). The title is what Play > Subscriptions lists."""
+    cand = texts[1:3]
+    return next((t for t in cand if " - " in t), cand[0] if cand else "")
 
 
 def _bottom(nodes: list[dict], pattern: re.Pattern) -> dict | None:

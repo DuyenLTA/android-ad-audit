@@ -197,3 +197,95 @@ def test_report_gate_lists_open_items():
     out = {"results": [{"checker": "a", "status": "PASS"}, {"checker": "b", "status": "CAN_XEM"},
                        {"checker": "c", "status": "BLOCKED"}, {"checker": "d", "status": "NA"}]}
     assert unresolved(out) == ["b", "c"]
+
+
+def test_screen_under_ad_flashing_back_before_the_next_one_is_not_same_screen(tmp_path):
+    q, bill = f"{PKG}/.Question", f"{PKG}/.Billing"
+    flash = [{"t": 0, "activity": q}, {"t": 1000, "activity": AD}, {"t": 30000, "activity": q}, {"t": 30600, "activity": bill}]
+    assert inter_changes_screen(run(tmp_path, activities=flash), {})["status"] == "PASS"
+    stays = [{"t": 0, "activity": q}, {"t": 1000, "activity": AD}, {"t": 30000, "activity": q}, {"t": 45000, "activity": bill}]
+    assert inter_changes_screen(run(tmp_path, activities=stays), {})["status"] == "FAIL"
+
+
+def test_app_name_on_billing_sheet_with_or_without_tagline():
+    from evidence_sub_purchase import _app_name_on_sheet
+    assert _app_name_on_sheet(["Weekly 6.99", "Lingix: AI Tutor Vocab Builder", "Starting today"]) == "Lingix: AI Tutor Vocab Builder"
+    assert _app_name_on_sheet(["Weekly", "Starting today", "Emberly - AI Photo"]) == "Emberly - AI Photo"
+    assert _app_name_on_sheet([]) == ""
+
+
+def test_ai_chat_report_sits_under_the_answer(tmp_path):
+    from checkers_reward_app_sub import ai_result_has_report_button
+    chat = [node(text="Hi there! What are we diving into today?"), node(text="Report answer", clickable=True),
+            node(desc="Send", clickable=True)]
+    r = run(tmp_path, frames=[frame(1, f"{PKG}/.MainActivity", chat)])
+    assert ai_result_has_report_button(r, {})["status"] == "PASS"
+    r = run(tmp_path, frames=[frame(1, f"{PKG}/.MainActivity", [chat[0], chat[2]])])
+    assert ai_result_has_report_button(r, {})["status"] == "FAIL"
+
+
+def test_fullscreen_cta_in_any_language_skips_close_and_ad_badge():
+    from evidence_click_probe import fullscreen_cta
+    node = lambda text, y, cls="android.widget.Button", click=True: {
+        "rid": "", "text": text, "desc": "", "cls": cls, "pkg": "x", "clickable": click, "bounds": (0, y, 100, y + 50)}
+    paused = [node("Ad", 10, "android.widget.TextView", False), node("了解详情", 800), node("Close", 1700),
+              node("了解详情", 1700)]
+    assert fullscreen_cta(paused)["bounds"][1] == 1700 and fullscreen_cta(paused)["text"] == "了解详情"
+    assert fullscreen_cta([node("Close", 1700), node("Skip", 1800)]) is None
+    assert fullscreen_cta([node("Xem Thêm", 900)])["text"] == "Xem Thêm"
+
+
+def _q_node(text="", desc="", cls="android.view.View", click=False, b=(0, 0, 10, 10)):
+    return {"rid": "", "text": text, "desc": desc, "cls": cls, "pkg": "x", "clickable": click, "bounds": b}
+
+
+def test_questionnaire_types_a_name_then_presses_continue():
+    from evidence_in_app_questionnaire import next_action
+    go_box = _q_node(click=True, b=(84, 2100, 996, 2268))
+    nodes = [_q_node("What should we call you?", b=(84, 440, 900, 660)),
+             _q_node("Enter your name", cls="android.widget.EditText", click=True, b=(84, 884, 996, 1050)),
+             go_box, _q_node("Continue →", b=(380, 2150, 700, 2210))]
+    kind, button, fill = next_action(nodes)
+    assert kind == "go" and button is go_box and fill[0]["cls"].endswith("EditText")
+
+
+def test_questionnaire_picks_first_answer_card_above_the_button():
+    from evidence_in_app_questionnaire import next_action
+    card1, card2 = _q_node(click=True, b=(60, 600, 1020, 760)), _q_node(click=True, b=(60, 780, 1020, 940))
+    nodes = [_q_node("How old are you?", b=(60, 400, 900, 500)), card1, _q_node("13–17", b=(100, 650, 300, 700)),
+             card2, _q_node("Start", click=True, b=(60, 2100, 1020, 2260))]
+    kind, button, fill = next_action(nodes)
+    assert kind == "go" and button["text"] == "Start" and fill == [card1]
+
+
+def test_questionnaire_never_presses_continue_on_a_paywall():
+    from evidence_in_app_questionnaire import next_action
+    nodes = [_q_node("Weekly", b=(60, 1400, 400, 1450)), _q_node("₫182,000 /week", b=(700, 1400, 1000, 1450)),
+             _q_node("Continue", click=True, b=(60, 2000, 1020, 2100))]
+    assert next_action(nodes)[0] == "stop"
+
+
+def test_questionnaire_stops_on_real_home():
+    from evidence_in_app_questionnaire import next_action
+    nodes = [_q_node("AI Tutor", b=(60, 150, 600, 260)), _q_node("Vocabulary", click=True, b=(388, 1969, 692, 2151))]
+    assert next_action(nodes)[0] == "stop"
+
+
+def test_questionnaire_uses_disabled_continue_label_when_name_is_empty():
+    from evidence_in_app_questionnaire import next_action
+    nodes = [_q_node("What should we call you?", b=(84, 430, 996, 674)),
+             _q_node("", cls="android.widget.EditText", click=True, b=(84, 882, 996, 1051)),
+             _q_node("Enter your name", b=(144, 936, 541, 997)), _q_node("Continue", b=(391, 2156, 606, 2214))]
+    kind, button, fill = next_action(nodes)
+    assert kind == "go" and button["text"] == "Continue" and fill[0]["cls"].endswith("EditText")
+
+
+def test_chat_cards_skip_tab_bar_and_native_ad_cards():
+    from evidence_chat_reward import chat_cards, watch_ad_gate
+    tutor = _q_node(click=True, b=(60, 463, 1020, 907))
+    ad_card = _q_node(click=True, b=(60, 949, 1020, 1393))
+    tab_bar = _q_node(click=True, b=(60, 1921, 1020, 2229))
+    nodes = [tutor, _q_node("Olivia", b=(468, 609, 638, 685)), ad_card, _q_node("Ad", b=(80, 960, 130, 1000)), tab_bar]
+    assert chat_cards(nodes, 1080, 2400) == [tutor]
+    gate = [_q_node("Watch Ad (0/3)", b=(374, 1505, 706, 1560)), _q_node("Maybe later", click=True)]
+    assert watch_ad_gate(gate)["text"] == "Watch Ad (0/3)"

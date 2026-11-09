@@ -3,7 +3,7 @@
 Each checker: (run, params) -> {"status", "reason", "evidence": [rel paths], "visual": {...}?}
 status: PASS / FAIL / CAN_XEM (Claude must look; `visual` says at what) / BLOCKED / NA.
 """
-from policy_evidence import Run
+from policy_evidence import Run, is_fullscreen_ad_activity
 
 PASS, FAIL, CAN_XEM, BLOCKED, NA = "PASS", "FAIL", "CAN_XEM", "BLOCKED", "NA"
 
@@ -37,12 +37,26 @@ def _app_open_like(run: Run, e) -> bool:
     return any(v["t"] <= e.start <= v["t"] + 20000 for v in run.jsonl("utility-visits.jsonl"))
 
 
+# The screen under the ad resumes for a moment before the app starts the next one (seen on AIP920:
+# Question back for 0.6s, then Billing). Only a screen that stays this long counts as "where the ad left you".
+SETTLE_MS = 2000
+
+
+def _settled_after(run: Run, e) -> str:
+    pkg = run.meta["package"] + "/"
+    nxt = next((a for a in run.activities if a["t"] > e.end and a["activity"].startswith(pkg)), None)
+    if e.after == e.before and nxt and nxt["t"] - e.end < SETTLE_MS and not is_fullscreen_ad_activity(nxt["activity"]):
+        return nxt["activity"]
+    return e.after
+
+
 def inter_changes_screen(run: Run, params: dict) -> dict:
     eps = [e for e in run.episodes() if e.end is not None and not _app_open_like(run, e)]
     if not eps:
         return _no_inter(run)
-    rows = [f"#{e.index}: {_short(e.before)} → ad → {_short(e.after)}" for e in eps]
-    same = [e for e in eps if e.before == e.after]
+    after = {e.index: _settled_after(run, e) for e in eps}
+    rows = [f"#{e.index}: {_short(e.before)} → ad → {_short(after[e.index])}" for e in eps]
+    same = [e for e in eps if e.before == after[e.index]]
     return {"status": FAIL if same else PASS,
             "reason": "; ".join(rows) + ("" if not same else " — tắt ad mà vẫn ở màn cũ"),
             "evidence": ["activities.jsonl"]}

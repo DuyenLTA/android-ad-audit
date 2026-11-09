@@ -53,7 +53,7 @@ async def follow_up(run_dir: Path, serial: str, buy_sub: bool) -> dict:
         adb(serial, "shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1")
         await asyncio.sleep(6)
         explorer = HomeExplorer(serial, package, ev, run_dir)
-        await explorer.back_to_app()
+        await explorer.close_fullscreen_ad()       # an ad left open (BACK does not close new-SDK ads)
         done = await explorer.explore()
         if buy_sub and done.get("paywall") and not json.loads(
                 (run_dir / "purchase.json").read_text(encoding="utf-8") if (run_dir / "purchase.json").exists()

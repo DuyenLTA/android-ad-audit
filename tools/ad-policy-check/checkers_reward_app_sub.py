@@ -199,13 +199,35 @@ def external_link_has_ad_label(run: Run, params: dict) -> dict:
                                                      "Nếu có, nó có chữ 'AD' hoặc cảnh báo sang nội dung khác không?"}}
 
 
+REPORT_RE = re.compile(r"^(report|báo cáo|report content|report answer|report message|report response|"
+                       r"báo cáo câu trả lời)$", re.I)
+SEND_RE = re.compile(r"^(send|gửi)$", re.I)
+
+
+def _ai_chat_report(run: Run) -> dict:
+    """AI chat apps (user chốt 09/11/2026): the report button sits right under each AI answer, not on a
+    result screen. A chat screen = app screen with a Send button and a message bubble."""
+    pkg = run.meta["package"]
+    chats = [f for f in run.frames if pkg in f.activity and any(SEND_RE.search((n["text"] or n["desc"]).strip())
+                                                               for n in f.nodes)]
+    if not chats:
+        return {"status": BLOCKED, "reason": "lượt này chưa tới được màn kết quả AI (gen ảnh) hay màn chat AI", "evidence": []}
+    hit = next((f for f in chats if any(REPORT_RE.search((n["text"] or n["desc"]).strip()) for n in f.nodes)), None)
+    f = hit or chats[0]
+    ev = [run.rel(f.png or f.xml)]
+    if hit:
+        return {"status": PASS, "reason": "chat AI: nút Report ngay dưới câu trả lời", "evidence": ev}
+    return {"status": FAIL, "reason": "chat AI: câu trả lời không có nút báo cáo", "evidence": ev}
+
+
 def ai_result_has_report_button(run: Run, params: dict) -> dict:
-    """Result screen = an app screen offering Download/Save/Share of what was generated."""
+    """Image/video generation: the result screen (Download/Save/Share of what was generated) carries the
+    report button. Chat apps put it under each answer instead — see _ai_chat_report."""
     results = [f for f in run.frames if run.meta["package"] in f.activity and sum(
         1 for n in f.nodes if re.search(r"download|tải xuống|save|lưu", n["text"] or n["desc"], re.I)) >= 1
         and any(re.search(r"share|chia sẻ", n["text"] or n["desc"], re.I) for n in f.nodes)]
     if not results:
-        return {"status": BLOCKED, "reason": "lượt này chưa tới được màn kết quả AI", "evidence": []}
+        return _ai_chat_report(run)
     with_report = [f for f in results if any(re.search(r"^(report|báo cáo|report content)$|report",
                                                        (n["text"] or n["desc"]).strip(), re.I) for n in f.nodes)]
     f = (with_report or results)[0]
