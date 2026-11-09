@@ -185,6 +185,12 @@ def reward_has_watch_ad_label(run: Run, params: dict) -> dict:
 
 
 def reward_click_handled(run: Run, params: dict) -> dict:
+    taps = [p for p in run.probes if p["kind"] == "reward_creative"]
+    if taps:
+        return _click(run, "reward_creative")
+    if any(p["kind"] == "reward" and p["handled"] for p in run.probes):
+        return {"status": BLOCKED, "reason": "đã mở reward ad từ nút Watch Ad nhưng chưa bấm được vào creative",
+                "evidence": ["click-probes.jsonl"]}
     if any(REWARD_RE.search(t) for f in run.frames for t in f.texts()):
         return {"status": BLOCKED, "reason": "có vị trí reward ad nhưng tool chưa bấm thử reward", "evidence": []}
     return {"status": NA, "reason": "lượt này không gặp reward ad", "evidence": []}

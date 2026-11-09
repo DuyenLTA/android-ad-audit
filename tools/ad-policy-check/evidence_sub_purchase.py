@@ -82,8 +82,14 @@ async def purchase_pass(ex, out_dir: Path) -> dict:
     if not act.startswith(PLAY):
         rec["result"] = f"không mở sheet thanh toán của Play (đang ở {act})"
         return _save(out_dir, rec)
-    await asyncio.sleep(2.5)
-    _act, sheet = await _look_any(ex)
+    # The sheet first shows "Loading…" (seen on Pixel 4); read it once it has real content.
+    sheet: list[dict] = []
+    for _ in range(6):
+        await asyncio.sleep(2.5)
+        _act, sheet = await _look_any(ex)
+        texts = [n["text"] for n in sheet if n["text"].strip()]
+        if texts and not all(re.fullmatch(r"loading…?|loading\.\.\.|đang tải…?", t.strip(), re.I) for t in texts):
+            break
     rec["billing_sheet_texts"] = [n["text"] for n in sheet if n["text"].strip()]
     rec["billing_sheet_t"] = ex._ms()
     # Only ever pay with Play's license-test card. Another account on the phone would be charged for real.
@@ -126,13 +132,20 @@ async def purchase_pass(ex, out_dir: Path) -> dict:
         rec["cancel_option_opens"] = act
         page = await _wait_play_page(ex, step)
         rec["cancel_page_texts"] = [n["text"] for n in page if n["text"].strip()][:30]
-        rec["cancelled"] = await _cancel_on_play(ex, page, step)
+        sheet_name = next((t for t in rec.get("billing_sheet_texts", [])[1:3] if " - " in t), "")
+        rec["cancelled"] = await _cancel_on_play(ex, page, step, sheet_name)
     else:
         rec["cancelled"] = False
         step("không thấy lựa chọn huỷ sub trong app; sub test vẫn còn hiệu lực")
     await ex.back_to_app()
     rec["result"] = "đã mua" + (", đã huỷ trên Play" if rec.get("cancelled") else ", CHƯA huỷ được sub")
     return _save(out_dir, rec)
+
+
+def _bottom(nodes: list[dict], pattern: re.Pattern) -> dict | None:
+    """The lowest node matching: Play repeats its button label ("Cancel subscription") as the page title."""
+    hits = [n for n in nodes if pattern.search((n["text"] or n["desc"]).strip()) and n["bounds"][3] > 0]
+    return max(hits, key=lambda n: n["bounds"][1]) if hits else None
 
 
 async def _wait_play_page(ex, step) -> list[dict]:
@@ -143,7 +156,7 @@ async def _wait_play_page(ex, step) -> list[dict]:
         await asyncio.sleep(2.5)
         _a, nodes = await _look_any(ex)
         texts = " ".join(n["text"] for n in nodes)
-        if PLAY_CANCEL_RE.search(texts) or "Cancel subscription" in texts or "Hủy gói" in texts:
+        if "Active" in texts or "Đang hoạt động" in texts or PLAY_CANCEL_RE.search(texts):
             return nodes
         if "Server error" in texts or "Something went wrong" in texts or "Đã xảy ra lỗi" in texts:
             if retried:
@@ -154,30 +167,34 @@ async def _wait_play_page(ex, step) -> list[dict]:
     return nodes
 
 
-async def _cancel_on_play(ex, page: list[dict], step) -> bool:
-    """Play > Subscriptions > Cancel: tap Cancel, pick the first reason, confirm."""
-    if not await _tap_label(ex, page, PLAY_CANCEL_RE):
-        step("trang Play không có nút Cancel subscription")
-        return False
+async def _cancel_on_play(ex, page: list[dict], step, app_name: str = "") -> bool:
+    """Play > Subscriptions (list) > this app's sub > Cancel subscription > (reason page) Cancel subscription.
+
+    Measured on Pixel 4 (04/11/2026): the list shows "Test: <app>" under Active; its page has the
+    cancel button at the bottom, the reason page again; success reads "Canceled".
+    """
+    name = re.escape(app_name.split(" - ")[0]) if app_name else ""
+    if name:
+        entry = next((n for n in page if re.search(rf"^(test: )?{name}", n["text"] or "", re.I)), None)
+        if entry:
+            await a_tap(ex.serial, *center(entry["bounds"]))
+            step(f"Play: mở gói {entry['text']}")
+            await asyncio.sleep(4)
     for _ in range(4):
-        await asyncio.sleep(2.5)
         _a, nodes = await _look_any(ex)
-        radios = [n for n in nodes if "RadioButton" in n["cls"] and n["clickable"]]
-        if radios:
-            await a_tap(ex.serial, *center(radios[0]["bounds"]))
-            await asyncio.sleep(1)
-        if await _tap_label(ex, nodes, PLAY_CANCEL_RE) or await _tap_label(ex, nodes, PLAY_NEXT_RE):
-            continue
-        texts = " ".join(n["text"] for n in nodes).lower()
-        if "cancel" in texts and ("ends" in texts or "kết thúc" in texts or "restore" in texts or "khôi phục" in texts):
+        texts = " ".join(n["text"] for n in nodes)
+        if re.search(r"\bCanceled\b|Đã hủy|Đã huỷ|will end on|sẽ kết thúc", texts):
             step("Play: đã huỷ")
+            await a_key(ex.serial, "KEYCODE_BACK")
             return True
-    _a, nodes = await _look_any(ex)
-    texts = " ".join(n["text"] for n in nodes).lower()
-    ok = "resubscribe" in texts or "đăng ký lại" in texts or "restore" in texts or "khôi phục" in texts
-    step("Play: đã huỷ" if ok else "Play: không xác nhận được đã huỷ")
+        btn = _bottom(nodes, PLAY_CANCEL_RE) or _bottom(nodes, PLAY_NEXT_RE)
+        if not btn:
+            break
+        await a_tap(ex.serial, *center(btn["bounds"]))
+        await asyncio.sleep(4)
+    step("Play: không xác nhận được đã huỷ")
     await a_key(ex.serial, "KEYCODE_BACK")
-    return ok
+    return False
 
 
 def _save(out_dir: Path, rec: dict) -> dict:

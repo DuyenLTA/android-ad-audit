@@ -141,3 +141,41 @@ def test_no_trial_is_not_applicable_but_missing_sale_fails(tmp_path):
         assert checker(r, {})["status"] == "NA"      # free trial is optional per app
     assert sub_sale_shows_both_prices(r, {})["status"] == "FAIL"
     assert sub_trial_then_price(run(tmp_path), {})["status"] == "BLOCKED"   # no paywall reached
+
+
+def test_picker_tiles_are_photos_not_tabs_or_cancel():
+    from evidence_home_explorer import photo_tiles
+    from ui_nodes import parse_nodes
+    xml = (Path(__file__).resolve().parent / "fixtures" / "system-photo-picker-pixel4.xml").read_text(encoding="utf-8")
+    tiles = photo_tiles(parse_nodes(xml))
+    assert tiles and all(t["desc"].startswith("Photo taken") for t in tiles)
+
+
+def _fixture_nodes(name):
+    from ui_nodes import parse_nodes
+    return parse_nodes((Path(__file__).resolve().parent / "fixtures" / name).read_text(encoding="utf-8"))
+
+
+def test_rate_dialog_closes_by_icon_id():
+    # AIP872 05/11/2026: the rate dialog's close icon has no text, only id btnDismiss; the run stuck on it.
+    from evidence_home_explorer import popup_closes
+    closes = popup_closes(_fixture_nodes("rate-dialog-icon-close-aip872.xml"),
+                          "com.aiphotogenearator.aivideogenerator.photogallery")
+    assert [c["rid"] for c in closes] == ["btnDismiss"]
+
+
+def test_upload_box_opens_picker_without_choose_n_label():
+    # AIP872 Image to Image: "Tap to Upload" box, no sample row, no "Choose N photo".
+    from evidence_home_explorer import HomeExplorer
+    nodes = _fixture_nodes("image-to-image-upload-aip872.xml")
+    box = HomeExplorer.gallery_box(HomeExplorer.__new__(HomeExplorer), nodes, None)
+    assert box and box["clickable"]
+
+
+def test_off_sub_turns_blocked_sub_rules_into_na():
+    from policy_check_runner import mark_off_sub
+    res = [{"checker": "sub_plan_info_complete", "status": "BLOCKED", "reason": "lượt này không tới được paywall"},
+           {"checker": "sub_sale_shows_both_prices", "status": "FAIL", "reason": "x"},
+           {"checker": "inter_click_handled", "status": "BLOCKED", "reason": "y"}]
+    mark_off_sub(res, "plan tuần ghi Off subs")
+    assert [r["status"] for r in res] == ["NA", "FAIL", "BLOCKED"]

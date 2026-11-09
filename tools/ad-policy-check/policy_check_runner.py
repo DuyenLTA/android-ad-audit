@@ -26,7 +26,15 @@ ALL = {**FULLSCREEN, **NATIVE, **APP_SUB}
 STATUSES = ("PASS", "FAIL", "CAN_XEM", "BLOCKED", "NA")
 
 
-def grade(run_dir: Path) -> dict:
+def mark_off_sub(results: list[dict], why: str) -> None:
+    """App ships without subscriptions (plan tuần "Off subs"): the Sub rules do not apply, they are not
+    blocked. A paywall that showed anyway still gets graded — that contradiction is worth a look."""
+    for r in results:
+        if r["checker"].startswith("sub_") and r["status"] == "BLOCKED":
+            r["status"], r["reason"] = "NA", f"app không bán sub ({why}) — {r['reason']}"
+
+
+def grade(run_dir: Path, off_sub: str | None = None) -> dict:
     checker_map = load_checker_map()
     reg = build_registry(fetch_policy_rules(checker_map["tabs"]), checker_map)
     run = load_run(run_dir)
@@ -55,6 +63,8 @@ def grade(run_dir: Path) -> dict:
         for r in results:
             if r["status"] == "NA" and r["checker"] != "sub_ios_restore":
                 r["status"], r["reason"] = "BLOCKED", f"lượt dừng sớm ({why}) — {r['reason']}"
+    if off_sub:
+        mark_off_sub(results, off_sub)
     drifted = {d["checker"] for d in reg["drifted"]}
     for r in results:
         if r["checker"] in drifted and r["status"] in ("PASS", "FAIL", "NA"):
@@ -90,8 +100,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run_dir", type=Path)
     ap.add_argument("--visual", type=Path, help="file verdict của Claude để gộp vào results.json")
+    ap.add_argument("--off-sub", metavar="LY_DO", help="app không bán sub (vd 'plan tuần ghi Off subs'): rule Sub thành N/A")
     args = ap.parse_args()
-    out = apply_visual(args.run_dir, args.visual) if args.visual else grade(args.run_dir)
+    out = apply_visual(args.run_dir, args.visual) if args.visual else grade(args.run_dir, args.off_sub)
     counts = {s: sum(1 for r in out["results"] if r["status"] == s) for s in STATUSES}
     print(" · ".join(f"{k} {v}" for k, v in counts.items()))
     for r in out["results"]:

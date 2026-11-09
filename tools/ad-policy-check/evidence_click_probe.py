@@ -53,6 +53,7 @@ class ClickProber:
         self.banner_done: set[str] = set()
         self.paywall_link_done = False
         self.last_tap = 0.0
+        self.reward_running = False
 
     def recently_tapped(self) -> bool:
         return time.monotonic() - self.last_tap < AFTER_TAP_GRACE_SECONDS
@@ -138,6 +139,8 @@ class ClickProber:
         if not activity:
             return False
         if is_fullscreen_ad_activity(activity):
+            if self.reward_running:       # a rewarded ad being watched for its reward: hands off
+                return False
             return await self._probe_fullscreen(activity, nodes, xml)
         self.in_fullscreen = False
         if not activity.startswith(self.package + "/"):

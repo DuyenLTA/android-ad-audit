@@ -53,6 +53,9 @@ paywall qua nút Pro) → mua sub test → tìm "Cancel sub" trong app → huỷ
 cd <tool> && PYTHONIOENCODING=utf-8 <repo>/.venv/Scripts/python policy_check_runner.py <run-dir>
 ```
 
+App không bán sub (plan tuần / tin build ghi "Off subs") thì thêm `--off-sub "plan tuần ghi Off subs"`: rule Sub
+đang BLOCKED vì không tới paywall thành **N/A**. Vẫn gặp paywall thì rule vẫn chấm bình thường, ghi mâu thuẫn vào notes.
+
 Ra `results.json` (mỗi checker: PASS / FAIL / CAN_XEM / BLOCKED / NA + lý do + bằng chứng) và
 `visual-queue.json`. Rule mới trong sheet chưa có checker hiện thành "chấm tay" — thêm checker vào
 `policy-checkers.json` + module `checkers_*.py` nếu làm được trong lượt.
