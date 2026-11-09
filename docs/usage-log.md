@@ -27,6 +27,11 @@ Lượt không còn dòng chưa chốt thì không mở agent nào, tính ~3 ph�
 | 22/10/2026 | learnenglish.language.learningvocabulary.practice | 2 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/LdVQX2zv8cTsMCwbHMKKMM) | ? | 30 phút | ? |
 | 23/10/2026 | fitness.workout.aitraining.abs.exercises | 1 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/XFC1UfgkBYBjYbwoDUfjxs) | ? | 30 phút | ? |
 | 28/10/2026 | photoeditor.ai.generator.photovideo.image | 1 | 0 xác nhận, 0 tranh chấp, 1 chưa chốt | 0 | [artifact](https://claude.ai/artifact/PyaeK1CoEwfgjuiGRBkyXj) | ? | 30 phút | ? |
+| 31/10/2026 | com.nxl.aiphotocreator.aivideogenerator.texttoimage | 20 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/5DLckuMX5uNmYTgRY7SwWs) | ? | 30 phút | ? |
+| 07/11/2026 | com.ai.art.aiimagegenerator.aivideogenerator.aiphoto.aiart | 9 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/77kEpap7p4mMF7TC16YcyG) | ? | 30 phút | ? |
+| 07/11/2026 | aitutor.grammar.languagetutor.iletslesson.learninglanguage | 1 | 2 xác nhận, 27 tranh chấp, 13 chưa chốt | 2 | [artifact](https://claude.ai/artifact/68NNHTP5JnM6q1NxPpvRet) | ? | 30 phút | ? |
+| 07/11/2026 | aiphoto.changebackground.photogenerator.aiimage | 1 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/KTBzkod3n6nGG9xE7fhprg) | ? | 30 phút | ? |
+| 09/11/2026 | com.aiphotogenearator.aivideogenerator.photogallery | 14 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/7Z3GWg6XfScUCHCoeSxDSr) | ? | 30 phút | ? |
 
 **Tổng:** 13 lần audit trên 9 app, test tay 390 phút, tool ~88 phút, tiết kiệm **~302 phút (~5 giờ)**.
 6 lỗi checklist xác nhận. Chưa có ticket Jira.
