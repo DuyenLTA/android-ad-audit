@@ -207,6 +207,20 @@ def test_screen_under_ad_flashing_back_before_the_next_one_is_not_same_screen(tm
     assert inter_changes_screen(run(tmp_path, activities=stays), {})["status"] == "FAIL"
 
 
+def test_single_activity_app_new_screen_after_inter_and_reward_ads_are_not_same_screen(tmp_path):
+    main = f"{PKG}/.MainActivity"
+    acts = [{"t": 0, "activity": main}, {"t": 10000, "activity": AD}, {"t": 40000, "activity": main},
+            {"t": 60000, "activity": AD}, {"t": 90000, "activity": main}]
+    home = frame(8000, main, [node(text=x) for x in ("AI Tutor", "PRO", "Aiko", "Deutsch", "Felix")])
+    chat = frame(45000, main, [node(text=x) for x in ("Aiko", "2/2", "SWITCH", "Change character", "Hold to talk")])
+    reward_tap = {"t": 55000, "kind": "reward", "activity": main}
+    r = run(tmp_path, activities=acts, probes=[reward_tap], frames=[home, chat])
+    assert inter_changes_screen(r, {})["status"] == "PASS"
+    # Same texts on both sides of the inter: the user really stayed where they were.
+    r2 = run(tmp_path, activities=acts[:3], frames=[home, frame(45000, main, home.nodes)])
+    assert inter_changes_screen(r2, {})["status"] == "FAIL"
+
+
 def test_app_name_on_billing_sheet_with_or_without_tagline():
     from evidence_sub_purchase import _app_name_on_sheet
     assert _app_name_on_sheet(["Weekly 6.99", "Lingix: AI Tutor Vocab Builder", "Starting today"]) == "Lingix: AI Tutor Vocab Builder"

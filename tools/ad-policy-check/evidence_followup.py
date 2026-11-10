@@ -50,6 +50,11 @@ async def follow_up(run_dir: Path, serial: str, buy_sub: bool) -> dict:
     sampler.start()
     done: dict = {}
     try:
+        bought = (run_dir / "purchase.json").exists() and "Subscribe" in (run_dir / "purchase.json").read_text(encoding="utf-8")
+        if bought:
+            # The app reads its billing state only on a cold start: without a kill it stays Premium (no ads)
+            # long after the test subscription has lapsed.
+            adb(serial, "shell", "am", "force-stop", package)
         adb(serial, "shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1")
         await asyncio.sleep(6)
         explorer = HomeExplorer(serial, package, ev, run_dir)

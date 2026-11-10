@@ -50,13 +50,43 @@ def _settled_after(run: Run, e) -> str:
     return e.after
 
 
+# A rewarded ad opens this long after the tap on its entry point ("Watch Ad"); it gives the user back the
+# screen they asked from, so it is not an interstitial that should lead somewhere new.
+REWARD_OPEN_MS = 15000
+def _is_reward(run: Run, e) -> bool:
+    return any(p["kind"] == "reward" and 0 <= e.start - p["t"] <= REWARD_OPEN_MS for p in run.probes)
+
+
+def _content_changed(run: Run, e, prev_end: int, next_start: float, prev_reward: bool) -> bool:
+    """Single-activity apps (Compose/fragments) swap screens inside one Activity: compare the texts on the
+    last dump before the ad with the first dump after it (neither crossing another ad). Mostly different
+    texts = a new screen. The explorer does not dump on a timer, so the last dump can be a minute old."""
+    before = [f for f in run.frames if prev_end <= f.t < e.start and not is_fullscreen_ad_activity(f.activity)]
+    if not before and prev_reward:
+        # A rewarded ad hands back the screen it was opened from: the dump before it is still the screen.
+        before = [f for f in run.frames if f.t < e.start and not is_fullscreen_ad_activity(f.activity)]
+    after = [f for f in run.frames if e.end <= f.t < next_start and not is_fullscreen_ad_activity(f.activity)]
+    if not before or not after:
+        return False
+    a, b = set(before[-1].texts()), set(after[0].texts())
+    if not a or not b:
+        return False
+    return len(a & b) / len(a | b) < 0.5
+
+
 def inter_changes_screen(run: Run, params: dict) -> dict:
-    eps = [e for e in run.episodes() if e.end is not None and not _app_open_like(run, e)]
+    every = run.episodes()
+    bounds = {e.index: ((every[i - 1].end or 0) if i else 0, every[i + 1].start if i + 1 < len(every) else float("inf"),
+                        bool(i) and _is_reward(run, every[i - 1]))
+              for i, e in enumerate(every)}
+    eps = [e for e in every if e.end is not None and not _app_open_like(run, e) and not _is_reward(run, e)]
     if not eps:
         return _no_inter(run)
     after = {e.index: _settled_after(run, e) for e in eps}
-    rows = [f"#{e.index}: {_short(e.before)} → ad → {_short(after[e.index])}" for e in eps]
-    same = [e for e in eps if e.before == after[e.index]]
+    moved = {e.index for e in eps if e.before == after[e.index] and _content_changed(run, e, *bounds[e.index])}
+    rows = [f"#{e.index}: {_short(e.before)} → ad → {_short(after[e.index])}"
+            + (" (màn khác trong cùng Activity)" if e.index in moved else "") for e in eps]
+    same = [e for e in eps if e.before == after[e.index] and e.index not in moved]
     return {"status": FAIL if same else PASS,
             "reason": "; ".join(rows) + ("" if not same else " — tắt ad mà vẫn ở màn cũ"),
             "evidence": ["activities.jsonl"]}
