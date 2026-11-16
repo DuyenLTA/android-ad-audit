@@ -34,7 +34,15 @@ def mark_off_sub(results: list[dict], why: str) -> None:
             r["status"], r["reason"] = "NA", f"app không bán sub ({why}) — {r['reason']}"
 
 
-def grade(run_dir: Path, off_sub: str | None = None) -> dict:
+SUB_TAB = "Sub_VN"
+
+
+def chi_sub(rules: list[dict]) -> bool:
+    """Checker / rule chi thuoc tab Sub_VN (rule dung chung Ad_VN / Doi tac van giu khi chi check ads)."""
+    return bool(rules) and all(r.get("tab") == SUB_TAB for r in rules)
+
+
+def grade(run_dir: Path, off_sub: str | None = None, chi_ads: bool = False) -> dict:
     checker_map = load_checker_map()
     reg = build_registry(fetch_policy_rules(checker_map["tabs"]), checker_map)
     run = load_run(run_dir)
@@ -42,6 +50,8 @@ def grade(run_dir: Path, off_sub: str | None = None) -> dict:
     for c in reg["checkers"]:
         if c["kind"] == "ios_only":
             continue                  # the tool checks Android only: iOS rules are skipped, not graded N/A
+        if chi_ads and chi_sub(c["rule_objs"]):
+            continue                  # luot chi check policy ads (khong mua sub): bo han rule Sub, khong cham N/A
         fn = ALL.get(c["id"])
         if fn is None:
             res = {"status": "CAN_XEM", "reason": "chưa có code chấm cho checker này — chấm tay", "evidence": []}
@@ -56,6 +66,8 @@ def grade(run_dir: Path, off_sub: str | None = None) -> dict:
                                    "good_example": r["good_example"], "bad_example": r["bad_example"]}
                                   for r in c["rule_objs"]], **res})
     for r in reg["unmapped"]:
+        if chi_ads and r.get("tab") == SUB_TAB:
+            continue
         results.append({"checker": f"unmapped-{r['tab']}-{r['no']}", "kind": "manual", "placement": "",
                         "rules": [r], "status": "CAN_XEM", "reason": "rule mới trong sheet, chưa có checker — chấm tay",
                         "evidence": []})
@@ -104,8 +116,11 @@ def main() -> int:
     ap.add_argument("run_dir", type=Path)
     ap.add_argument("--visual", type=Path, help="file verdict của Claude để gộp vào results.json")
     ap.add_argument("--off-sub", metavar="LY_DO", help="app không bán sub (vd 'plan tuần ghi Off subs'): rule Sub thành N/A")
+    ap.add_argument("--chi-ads", action="store_true",
+                    help="chỉ chấm policy ads: bỏ rule chỉ thuộc tab Sub_VN (lượt chạy kèm bộ IAA của rc-check)")
     args = ap.parse_args()
-    out = apply_visual(args.run_dir, args.visual) if args.visual else grade(args.run_dir, args.off_sub)
+    out = (apply_visual(args.run_dir, args.visual) if args.visual
+           else grade(args.run_dir, args.off_sub, chi_ads=args.chi_ads))
     counts = {s: sum(1 for r in out["results"] if r["status"] == s) for s in STATUSES}
     print(" · ".join(f"{k} {v}" for k, v in counts.items()))
     for r in out["results"]:

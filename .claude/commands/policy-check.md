@@ -1,6 +1,6 @@
 ---
 description: Check policy Ads + Sub (sheet Apero Policy) của một app Android trên máy thật, rồi xuất báo cáo artifact
-argument-hint: "<package> [--serial <serial>] [--no-sub] [--no-fresh] [--grade <run-dir>]"
+argument-hint: "<package> [--serial <serial>] [--chi-ads] [--no-sub] [--no-fresh] [--grade <run-dir>]"
 ---
 
 Check policy quảng cáo và gói mua của một app theo sheet **Apero Policy** (tab Đối tác + Ad_VN + Sub_VN,
@@ -30,6 +30,10 @@ Không thấy repo nào thì dừng và nêu các chỗ đã thử. Mọi lệnh
 
 `--grade <run-dir>`: bỏ qua bước 2, chấm lại một lượt đã có.
 
+`--chi-ads` (rc-check gọi ở lượt có bộ IAA, user chốt 16/11/2026): chỉ check policy **ads** — gom bằng chứng với
+`--no-sub` (không mua sub, cả `evidence_followup.py`), chấm với `--chi-ads` (bỏ hẳn rule chỉ thuộc tab Sub_VN, không ghi
+N/A); report và câu báo chỉ có rule Đối tác + Ad_VN.
+
 ## 2. Gom bằng chứng (máy)
 
 ```
@@ -54,7 +58,7 @@ paywall qua nút Pro) → mua sub test → tìm "Cancel sub" trong app → huỷ
 cd <tool> && PYTHONIOENCODING=utf-8 <repo>/.venv/Scripts/python policy_check_runner.py <run-dir>
 ```
 
-App không bán sub (plan tuần / tin build ghi "Off subs") thì thêm `--off-sub "plan tuần ghi Off subs"`: rule Sub
+Lượt `--chi-ads` thì thêm `--chi-ads`. App không bán sub (plan tuần / tin build ghi "Off subs") thì thêm `--off-sub "plan tuần ghi Off subs"`: rule Sub
 đang BLOCKED vì không tới paywall thành **N/A**. Vẫn gặp paywall thì rule vẫn chấm bình thường, ghi mâu thuẫn vào notes.
 
 Ra `results.json` (mỗi checker: PASS / FAIL / CAN_XEM / BLOCKED / NA + lý do + bằng chứng) và
