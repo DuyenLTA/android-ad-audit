@@ -16,6 +16,14 @@ import zipfile
 from shutil import which
 
 APK_ID_BYTES_RE = re.compile(rb"ca-app-pub-\d+[/~]\d+")
+# Binary AndroidManifest.xml (and some dex/arsc string pools) store strings as
+# UTF-16LE, so the App ID meta-data value never matches the ASCII pattern above.
+# Without this the scan saw only the SDK's placeholder App ID and reported the
+# real one as "seen in the log but not in the build".
+APK_ID_UTF16_RE = re.compile(
+    rb"c\x00a\x00-\x00a\x00p\x00p\x00-\x00p\x00u\x00b\x00-\x00"
+    rb"(?:\d\x00)+[/~]\x00(?:\d\x00)+"
+)
 AAPT2_VALUE_RE = re.compile(r'android:value\S*="([^"]+)"')
 VERSION_CODE_RE = re.compile(r"versionCode=(\d+)")
 
@@ -281,4 +289,5 @@ def apk_ad_ids(apk_path) -> set[str]:
                 with zf.open(info) as entry:
                     blob = entry.read()
                 ids.update(m.decode("ascii") for m in APK_ID_BYTES_RE.findall(blob))
+                ids.update(m.decode("utf-16-le") for m in APK_ID_UTF16_RE.findall(blob))
     return ids

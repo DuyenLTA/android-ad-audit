@@ -156,6 +156,20 @@ def test_ad_ids_are_collected_across_splits(tmp_path):
     }
 
 
+def test_app_id_stored_utf16_in_binary_manifest_is_found(tmp_path):
+    # Binary AndroidManifest.xml keeps its string pool in UTF-16LE; an
+    # ASCII-only sweep missed the real App ID and kept only the dex placeholder.
+    apk = _apk(
+        tmp_path / "base.apk",
+        ("AndroidManifest.xml", "x\0ca-app-pub-4584260126367940~5371562314".encode("utf-16-le")),
+        ("classes.dex", b"ca-app-pub-0000000000000000~0000000000"),
+    )
+    assert apk_source.apk_ad_ids(apk) == {
+        "ca-app-pub-4584260126367940~5371562314",
+        "ca-app-pub-0000000000000000~0000000000",
+    }
+
+
 def test_base_is_offered_first(monkeypatch):
     # The manifest is read from base, so its position in the list is a contract.
     monkeypatch.setattr(
