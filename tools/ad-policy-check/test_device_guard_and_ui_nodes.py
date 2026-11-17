@@ -40,3 +40,18 @@ def test_native_still_loading_has_shimmer_and_no_adchoices():
 def test_fullscreen_ad_activities_are_recognised():
     assert is_fullscreen_ad_activity(f"{PKG}/com.google.android.libraries.ads.mobile.sdk.common.AdActivity")
     assert not is_fullscreen_ad_activity(f"{PKG}/com.vsl.aip862_aihairstyle.ui.splash.SplashActivity")
+
+
+def test_hold_device_khi_job_cha_da_giu_khoa(monkeypatch, tmp_path):
+    # Bot rc-check giu khoa may cho ca job va dat RCR_GIU_MAY=<serial>: policy-check chay ben trong khong tu chan minh.
+    import device_guard
+    monkeypatch.setattr(device_guard, "lock_path", lambda s: tmp_path / f".may-{s}.lock")
+    with device_guard.hold_device("S1"):
+        monkeypatch.setenv("RCR_GIU_MAY", "S1")
+        with device_guard.hold_device("S1"):          # cung serial voi job cha -> khong khoa lai
+            pass
+        monkeypatch.setenv("RCR_GIU_MAY", "S2")
+        import pytest
+        with pytest.raises(BlockingIOError):         # serial khac van bi chan nhu cu
+            with device_guard.hold_device("S1"):
+                pass

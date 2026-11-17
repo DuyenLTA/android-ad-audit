@@ -33,6 +33,9 @@ class ForeignDriverError(RuntimeError):
     """The phone is showing an app this journey did not open."""
 
 
+PARENT_HOLDS_ENV = "RCR_GIU_MAY"
+
+
 def lock_path(serial: str) -> Path:
     return RC_REPO / "out" / f".may-{serial}.lock"
 
@@ -62,7 +65,14 @@ def _unlock(fd: int) -> None:
 
 @contextmanager
 def hold_device(serial: str):
-    """Hold the shared device lock for the block; BlockingIOError if another run has it."""
+    """Hold the shared device lock for the block; BlockingIOError if another run has it.
+
+    A parent job (rc-check bot job, rcr-iaa) that already holds the lock for this serial exports
+    RCR_GIU_MAY=<serial> (rcr.bot_hang_doi.ENV_CHA_GIU): locking again would block our own job.
+    """
+    if serial and os.environ.get(PARENT_HOLDS_ENV, "") == serial:
+        yield
+        return
     path = lock_path(serial)
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_RDWR | os.O_CREAT)
