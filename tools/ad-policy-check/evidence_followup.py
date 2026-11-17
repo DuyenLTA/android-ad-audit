@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 import evidence_collector as ec  # sets up sys.path for rc-check's driver
-from adb_sync import adb
+from adb_sync import a_key, a_top_activity, adb
 from evidence_click_probe import ClickProber
 from evidence_home_explorer import HomeExplorer
 from evidence_sub_purchase import purchase_pass
@@ -33,6 +33,21 @@ def _last_ms(run_dir: Path) -> int:
         if p.exists():
             times += [json.loads(x)["t"] for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
     return max(times, default=0)
+
+
+async def back_to_home(serial: str, package: str, home: str, tries: int = 4) -> None:
+    """The launcher reopens the app on the screen it was left on (AIP862 3.0.0 11/11/2026: Settings), where
+    the Home exploration finds no content / Pro entry and settles nothing. BACK until the Home activity
+    the main pass stopped at is on top; BACK never leaves the app (stops when the top is not the app)."""
+    if not home:
+        return
+    for _ in range(tries):
+        act = await a_top_activity(serial) or ""
+        if not act.startswith(package + "/") or act.split("/", 1)[1].lstrip(".") in home or home.endswith(
+                act.split("/", 1)[1]):
+            return
+        await a_key(serial, "KEYCODE_BACK")
+        await asyncio.sleep(1.5)
 
 
 async def follow_up(run_dir: Path, serial: str, buy_sub: bool) -> dict:
@@ -59,6 +74,7 @@ async def follow_up(run_dir: Path, serial: str, buy_sub: bool) -> dict:
         await asyncio.sleep(6)
         explorer = HomeExplorer(serial, package, ev, run_dir)
         await explorer.close_fullscreen_ad()       # an ad left open (BACK does not close new-SDK ads)
+        await back_to_home(serial, package, meta.get("stopped_at") or "")
         done = await explorer.explore()
         if buy_sub and done.get("paywall") and not json.loads(
                 (run_dir / "purchase.json").read_text(encoding="utf-8") if (run_dir / "purchase.json").exists()
