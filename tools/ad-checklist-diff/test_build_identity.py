@@ -120,3 +120,54 @@ def test_drive_carries_on_while_the_watcher_is_quiet():
         should_abandon=lambda: None,
     )
     assert result["stopped"] != "abandoned"
+
+
+def test_watcher_ignores_the_marker_from_another_app(tmp_path):
+    # Device log holds every app: another Apero app in dev variant must not stop
+    # the audit of a release build (10/11/2026, AI Art 3.9.0 said dev: false).
+    path = tmp_path / "c.log"
+    path.write_text(
+        "11-10 16:53:27.933 26583 26583 I AdSdk   : Config variant dev: false\n"
+        "11-10 16:53:52.944 27589 27589 I AperoAd : Config variant dev: true\n",
+        encoding="utf-8",
+    )
+    assert build_identity.log_watcher(str(path), pids=lambda: {"26583"})() is None
+
+
+def test_watcher_still_stops_on_the_audited_apps_own_marker(tmp_path):
+    path = tmp_path / "c.log"
+    path.write_text(
+        "11-10 16:53:52.944 27589 27589 I AperoAd : Config variant dev: true\n",
+        encoding="utf-8",
+    )
+    assert build_identity.log_watcher(str(path), pids=lambda: {"27589"})() is not None
+
+
+def test_sandbox_from_another_app_is_not_a_sign(tmp_path):
+    # Device-wide capture: another app's `setupAdjust: sandbox` must not mark a
+    # release build as dev (10/11/2026, AI Art 3.9.0).
+    lines = [
+        "11-10 16:56:21.759 31142 31142 I aver.nolastseen: Using generational CollectorTypeCC GC.",
+        "11-10 16:56:22.769 31142 31142 I Application: setupAdjust: sandbox",
+        "11-10 16:56:52.203 31612 31612 I generator.aiart: Using generational CollectorTypeCC GC.",
+        "11-10 16:57:02.509 31612 31612 I FOR_TESTER_CONFIG: Adjust config environment: production",
+    ]
+    own = build_identity.app_lines(lines, "ai.photogenerator.aivideo.aivideogenerator.aiart")
+    assert own == [lines[2], lines[3]]
+    result = {"extra": ["sandbox"], "sections": {}}
+    assert dev_build_signals(result, own) == []
+    assert dev_build_signals(result) == ["Adjust đang ở môi trường sandbox"]
+
+
+def test_sandbox_from_the_app_itself_is_still_a_sign():
+    lines = [
+        "11-10 16:56:52.203 31612 31612 I generator.aiart: Using generational CollectorTypeCC GC.",
+        "11-10 16:56:52.769 31612 31612 I Application: setupAdjust: sandbox",
+    ]
+    own = build_identity.app_lines(lines, "ai.photogenerator.aivideo.aivideogenerator.aiart")
+    assert dev_build_signals({"extra": ["sandbox"], "sections": {}}, own) == [
+        "Adjust đang ở môi trường sandbox"]
+
+
+def test_no_process_line_falls_back_to_whole_capture():
+    assert build_identity.app_lines(["I Application: setupAdjust: sandbox"], "a.b.c") is None

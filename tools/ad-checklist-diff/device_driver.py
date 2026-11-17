@@ -138,7 +138,11 @@ def capture_pass(
         # on the journey's own loop, that turns "walk every screen of a build
         # nobody should audit" into a few seconds.
         log_path = getattr(log_file, "name", None)
-        watch = log_watcher(log_path, flush=log_file.flush) if log_path else None
+        # Only the audited app's own lines count: another Apero app on the phone
+        # in its dev variant prints the same marker into the same device log.
+        app_pids = lambda: set(run(["shell", "pidof", package]).split())  # noqa: E731
+        watch = (log_watcher(log_path, flush=log_file.flush, pids=app_pids)
+                 if log_path else None)
         result = drive_to_home(
             package=package,
             home_match=home_match,

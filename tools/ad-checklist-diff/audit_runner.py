@@ -28,7 +28,7 @@ from pathlib import Path
 
 from apk_source import apk_ad_ids, base_apk, cache_path, device_version_code
 from apk_verifier import scan_can_answer
-from build_identity import dev_build_signals
+from build_identity import app_lines, dev_build_signals
 from app_registry import (
     DEFAULT_REGISTRY,
     load_apps,
@@ -170,7 +170,12 @@ def audit_one(
     # run's delta is measured against, and a dev build's result is not a baseline
     # for anything; saving it would make the following release run report 45
     # "fixed" rows that were never broken.
-    signals = dev_build_signals(result)
+    own = None
+    if capture_log:
+        # Capture is device-wide: judge the build only on its own processes' lines.
+        with open(capture_log, encoding="utf-8", errors="replace") as handle:
+            own = app_lines(handle, package)
+    signals = dev_build_signals(result, own)
     if signals and not allow_dev_build:
         return {
             "package": package,
