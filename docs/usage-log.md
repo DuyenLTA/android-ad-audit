@@ -35,6 +35,8 @@ Lượt không còn dòng chưa chốt thì không mở agent nào, tính ~3 ph�
 | 10/11/2026 | com.ai.aiphoto.aivideo.creator.generator | 6 | 0 xác nhận, 1 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/FKWDs2uZ7nKPtdwQb5qKFB) | ? | 30 phút | ? |
 | 11/11/2026 | photomaker.image.editor.ai | 5 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/T2vBPjZ79NRHKKKVuyxxMc) | ? | 30 phút | ? |
 | 11/11/2026 | com.ai.aiimage.aivideogenerator | 16 | 0 xác nhận, 0 tranh chấp, 0 chưa chốt | 0 | [artifact](https://claude.ai/artifact/CahMUPeEeUQfcRwDPL7Mta) | ? | 30 phút | ? |
+| 09/11/2026 | aisong.generator.creatsong.music | 14 | Sạch | ? | [artifact](https://claude.ai/artifact/Hh6WCSke4dr2TvToNLiFm3) | ? | 30 phút | ? |
+| 16/11/2026 | fitness.workout.aitraining.abs.exercises | 1 | 6 dòng chưa kết luận | ? | [artifact](https://claude.ai/artifact/FDCd5pyFbWJDDDRZZdvBke) | ? | 30 phút | ? |
 
 **Tổng:** 13 lần audit trên 9 app, test tay 390 phút, tool ~88 phút, tiết kiệm **~302 phút (~5 giờ)**.
 6 lỗi checklist xác nhận. Chưa có ticket Jira.
