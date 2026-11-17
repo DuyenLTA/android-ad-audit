@@ -455,3 +455,23 @@ def test_columns_the_parser_ignores_do_not_change_it():
     plain = parse_checklist_csv("S,,\nx,v,\n")
     commented = parse_checklist_csv("S,,\nx,v,,ghi chú của ads-team\n")
     assert checklist_fingerprint(plain) == checklist_fingerprint(commented)
+
+
+def test_parse_bang_nhieu_cot_lay_ad_name_va_ad_id():
+    """Muc 3 'ID ads inapp' la bang (No.|Screen|Ad Name|...|Ad ID): lay Ad Name + Ad ID, ke ca dong cap high/thuong
+    co cot A/B trong (AIP893 16/11/2026: 9 dong muc 3 doc nham cot)."""
+    csv_text = (
+        "2. Ads,\n"
+        "102_spl_n_inter,ca-app-pub-1/111\n"
+        "3. ID ads inapp,\n"
+        "No.,Screen,Ad Name,Priority,Ad description,Ad Type,Ad ID,Key remote\n"
+        "1,Loading,native_loading_high,1,desc,Native,ca-app-pub-1/222,x\n"
+        ",,native_loading,2,,,ca-app-pub-1/333,x\n"
+        "4. Khac,\n"
+        "abc,def\n"
+    )
+    rows = parse_checklist_csv(csv_text)
+    m3 = [(r["label"], r["value"]) for r in rows if r["section"].startswith("3")]
+    assert m3 == [("native_loading_high", "ca-app-pub-1/222"), ("native_loading", "ca-app-pub-1/333")]
+    assert ("102_spl_n_inter", "ca-app-pub-1/111") in [(r["label"], r["value"]) for r in rows]
+    assert ("abc", "def") in [(r["label"], r["value"]) for r in rows if r["section"].startswith("4")]

@@ -62,10 +62,30 @@ def parse_checklist_csv(csv_text: str) -> list[dict]:
     reader = csv.reader(io.StringIO(csv_text))
     rows = []
     section = "(no section)"
+    bang = None   # (cot ten, cot ID) khi section la bang nhieu cot co header "Ad ID" (muc 3 "ID ads inapp")
     for cols in reader:
         col_a = (cols[0].strip() if len(cols) > 0 else "")
         col_b = (cols[1].strip() if len(cols) > 1 else "")
         col_c = (cols[2].strip() if len(cols) > 2 else "")
+        sach = [c.strip() for c in cols]
+        thuong = [c.lower() for c in sach]
+        if "ad id" in thuong:
+            # Header bang: "No. | Screen | Ad Name | ... | Ad Type | Ad ID | Key remote". Section 3 cua sheet
+            # 'Check thong so KT' khong phai label|value: doc cot A/B lay nham "No."/"Screen", dong cap high/thuong
+            # (cot A, B trong) bi bo (AIP893 16/11/2026: 9 dong muc 3 khong doi chieu duoc).
+            ten = next((i for i, c in enumerate(thuong) if c in ("ad name", "name", "placement")), None)
+            bang = (ten if ten is not None else 0, thuong.index("ad id"))
+            continue
+        if bang is not None:
+            if col_a and not any(sach[1:]):
+                bang = None          # dong tieu de section moi -> ve kieu label|value
+            else:
+                ten, cot_id = bang
+                label = sach[ten] if ten < len(sach) else ""
+                value = sach[cot_id] if cot_id < len(sach) else ""
+                if label and value:
+                    rows.append({"section": section, "label": label, "value": value, "alt_values": []})
+                continue
         if not col_a and not col_b:
             continue
         if col_a and not col_b:
